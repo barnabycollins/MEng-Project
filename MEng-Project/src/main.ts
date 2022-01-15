@@ -7,7 +7,7 @@ app.innerHTML = `
   <a href="https://vitejs.dev/guide/features.html" target="_blank">Documentation</a>
 `
 
-import { Faust } from "faust2webaudio";
+import { Faust, FaustAudioWorkletNode, FaustScriptProcessorNode } from "faust2webaudio";
 const audioCtx = new window.AudioContext();
 const code = `
 import("stdfaust.lib");
@@ -23,13 +23,14 @@ effect = dm.freeverb_demo;`;
 
 const faust = new Faust({
   debug: true,
-  wasmLocation: "libfaust/libfaust-wasm.wasm",
-  dataLocation: "libfaust/libfaust-wasm.data"
+  wasmLocation: "src/libfaust/libfaust-wasm.wasm",
+  dataLocation: "src/libfaust/libfaust-wasm.data"
 });
 
 await faust.ready;
 
-faust.getNode(polycode, { audioCtx, useWorklet: window.AudioWorklet ? true : false, voices: 4, args: { "-I": "https://faust.grame.fr/tools/editor/libraries/" } })
+let node: FaustScriptProcessorNode | FaustAudioWorkletNode;
+node = faust.getNode(code, { audioCtx, useWorklet: window.AudioWorklet ? true : false, args: { "-I": "https://faust.grame.fr/tools/editor/libraries/" } })
 .then(node => node.connect(audioCtx.destination));
-faust.getNode(code, { audioCtx, useWorklet: window.AudioWorklet ? true : false, args: { "-I": "https://faust.grame.fr/tools/editor/libraries/" } })
-.then(node => node.connect(audioCtx.destination));
+/*faust.getNode(polycode, { audioCtx, useWorklet: window.AudioWorklet ? true : false, voices: 4, args: { "-I": "https://faust.grame.fr/tools/editor/libraries/" } })
+.then(node => node.connect(audioCtx.destination));*/
