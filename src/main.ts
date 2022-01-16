@@ -30,7 +30,7 @@ const faust = new Faust({
 await faust.ready;
 
 let node: FaustScriptProcessorNode | FaustAudioWorkletNode;
-node = await faust.getNode(code, { audioCtx, useWorklet: window.AudioWorklet ? true : false, args: { "-I": "https://raw.githubusercontent.com/grame-cncm/faustlibraries/4cd48b91f1170498c1cf5d8ee5b87cda6cd797df/" } })
+node = await faust.getNode(code, { audioCtx, useWorklet: window.AudioWorklet ? true : false, args: { "-I": "libraries/" } })
 .then(node => node.connect(audioCtx.destination));
 /*faust.getNode(polycode, { audioCtx, useWorklet: window.AudioWorklet ? true : false, voices: 4, args: { "-I": "https://faust.grame.fr/tools/editor/libraries/" } })
 .then(node => node.connect(audioCtx.destination));*/
