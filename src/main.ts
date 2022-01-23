@@ -1,13 +1,5 @@
-import './style.css'
-
-const app = document.querySelector<HTMLDivElement>('#app')!
-
-app.innerHTML = `
-  <h1>Hello Vite!</h1>
-  <a href="https://vitejs.dev/guide/features.html" target="_blank">Documentation</a>
-`
-
 import {Faust, FaustAudioWorkletNode, FaustScriptProcessorNode} from "faust2webaudio";
+
 const audioCtx = new window.AudioContext();
 const code = `
 import("stdfaust.lib");
@@ -34,8 +26,19 @@ let node: FaustAudioWorkletNode;
 .then(node => node.connect(audioCtx.destination));*/
 node = await faust.getNode(polycode, { audioCtx, useWorklet: true, voices: 4, args: { "-I": "libraries/" } }) as FaustAudioWorkletNode;
 console.log(node.getParams());
+
+// typescript-eslint-ignore
 node.connect(audioCtx.destination);
 node.keyOn(0, 60, 100);
 setTimeout(() => node.keyOn(0, 64, 40), 500);
 setTimeout(() => node.keyOn(0, 67, 80), 1000);
 setTimeout(() => node.allNotesOff(), 5000);
+
+const uiWindow = (document.getElementById("ui-frame") as HTMLIFrameElement).contentWindow;
+node.setOutputParamHandler((path: string, value: number) => {
+  const msg = {path, value, type: "param"};
+  uiWindow?.postMessage(msg, "*");
+});
+
+const msg = {type: "ui", ui: node.getUI()};
+uiWindow?.postMessage(msg, "*");
