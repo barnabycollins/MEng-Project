@@ -1,8 +1,11 @@
 import {Faust, FaustAudioWorkletNode} from "faust2webaudio";
 import {WebMidi} from "webmidi";
 import {code, polycode, midicode} from "./programs";
+import * as c from "./constructs";
 
+const constructedCode = new c.AudioOutput([new c.MathsNode('*', new c.Oscillator('triangle', new c.MIDIFreq()), new c.MIDIGate())]).getOutputString();
 
+console.log(constructedCode);
 
 // LOGGING
 const LOG = false;
@@ -30,7 +33,7 @@ await faust.ready;
 
 // Compile a new Web Audio node from faust code
 let node: FaustAudioWorkletNode;
-node = await faust.getNode(midicode, { audioCtx, useWorklet: true, voices: 4, args: { "-I": "libraries/" } }) as FaustAudioWorkletNode;
+node = await faust.getNode(constructedCode, { audioCtx, useWorklet: true, voices: 4, args: { "-I": "libraries/" } }) as FaustAudioWorkletNode;
 
 // Connect the node's output to Web Audio
 node.connect(audioCtx.destination);
