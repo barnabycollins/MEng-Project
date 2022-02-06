@@ -1,5 +1,5 @@
 import {Faust, FaustAudioWorkletNode} from "faust2webaudio";
-import {WebMidi} from "webmidi";
+import {WebMidi, Input, MessageEvent} from "webmidi";
 import {code, polycode, midicode} from "./programs";
 import * as c from "./constructs";
 
@@ -70,8 +70,8 @@ if (WebMidi.inputs.length < 1) {
   console.log("No MIDI input devices detected.");
 }
 else {
-  WebMidi.inputs.forEach(device => {
-    device.addListener("midimessage", e => {
+  WebMidi.inputs.forEach((device: Input) => {
+    device.addListener("midimessage", (e: MessageEvent) => {
       node.midiMessage(e.message.data);
 
       log(`Received ${e.message.type} from ${device.name}`);

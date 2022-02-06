@@ -34,6 +34,20 @@ class MIDIGain extends ValueNode {
     }
 }
 
+class Constant extends ValueNode {
+    value: number;
+
+    constructor(value: number) {
+        super();
+
+        this.value = value;
+    }
+
+    getNodeStrings(): NodeStringsType {
+        return [[], `${this.value}`];
+    }
+}
+
 class MathsNode extends ValueNode {
     operation: MathsOperationType;
     inputL: ValueNode | SynthNode;
@@ -102,6 +116,7 @@ class AudioOutput extends SynthNode {
         let processStrings = inputStrings.map(nodeStrings => nodeStrings[1]);
 
         const graphString = `import("stdfaust.lib");
+
 // TOP STATEMENTS
 ${topStrings.join('\n')}
 
@@ -113,4 +128,4 @@ process = ${processStrings.join(' + ')};
     }
 }
 
-export {MIDIGate, MIDIFreq, MIDIGain, MathsNode, Oscillator, AudioOutput};
+export {MIDIGate, MIDIFreq, MIDIGain, Constant, MathsNode, Oscillator, AudioOutput};
