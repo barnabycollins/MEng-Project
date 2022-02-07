@@ -76,7 +76,7 @@ class Parameter extends ValueNode {
     }
 
     getNodeStrings(): NodeStringsType {
-        return {definitions: [`${this.varName} = hslider("${this.name}[midi:ctrl ${this.index}", ${this.defaultValue}, ${this.range.min}, ${this.range.max}, ${this.range.step});`], processCode: this.varName};
+        return {definitions: [`${this.varName} = hslider("${this.name} (${this.varName})[midi:ctrl ${this.index}]", ${this.defaultValue}, ${this.range.min}, ${this.range.max}, ${this.range.step});`], processCode: this.varName};
     }
 }
 
