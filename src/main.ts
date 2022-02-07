@@ -3,7 +3,7 @@ import {WebMidi, Input, MessageEvent} from "webmidi";
 import {code, polycode, midicode} from "./programs";
 import * as c from "./constructs";
 
-const constructedCode = new c.AudioOutput([new c.MathsNode('*', new c.Oscillator('triangle', new c.MIDIFreq()), new c.MIDIGate())]).getOutputString();
+const constructedCode = new c.AudioOutput([new c.MathsNode('*', new c.Oscillator('triangle', new c.MIDIFreq()), new c.Envelope())]).getOutputString();
 
 console.log(constructedCode);
 

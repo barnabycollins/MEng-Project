@@ -1,12 +1,14 @@
 
 type WaveformType = 'sine' | 'saw' | 'square' | 'triangle';
 
-type NodeStringsType = [string[], string];
+type NodeStringsType = {definitions: string[], processCode: string};
 type MathsOperationType = '+' | '-' | '*' | '/';
+
+type ParamRangeType = {min: number, max: number, step: number};
 
 class BaseNode {
     getNodeStrings(): NodeStringsType {
-        return [[], 'Base Class!'];
+        return {definitions: [], processCode: ''};
     }
 }
 
@@ -18,19 +20,19 @@ class ValueNode extends BaseNode {
 
 class MIDIGate extends ValueNode {
     getNodeStrings(): NodeStringsType {
-        return [[`midigate = button("gate");`], `midigate`];
+        return {definitions: [`midigate = button("gate");`], processCode: `midigate`};
     }
 }
 
 class MIDIFreq extends ValueNode {
     getNodeStrings(): NodeStringsType {
-        return [[`midifreq = nentry("freq[unit:Hz]", 440, 20, 20000, 1);`], `midifreq`];
+        return {definitions: [`midifreq = hslider("freq[unit:Hz]", 440, 20, 20000, 1);`], processCode: `midifreq`};
     }
 }
 
 class MIDIGain extends ValueNode {
     getNodeStrings(): NodeStringsType {
-        return [[`midigain = nentry("gain", 0.5, 0, 0.5, 0.01);`], `midigain`];
+        return {definitions: [`midigain = hslider("gain", 0.5, 0, 0.5, 0.01);`], processCode: `midigain`};
     }
 }
 
@@ -44,7 +46,82 @@ class Constant extends ValueNode {
     }
 
     getNodeStrings(): NodeStringsType {
-        return [[], `${this.value}`];
+        return {definitions: [], processCode: `${this.value}`};
+    }
+}
+
+let paramCount = 0;
+class Parameter extends ValueNode {
+    index: number;
+    name: string;
+    varName: string;
+    defaultValue: number;
+    range: ParamRangeType;
+
+    constructor(defaultValue: number, range: ParamRangeType = {min: 0, max: 20000, step: 0.1}, name: undefined | string = undefined) {
+        super();
+
+        this.index = paramCount;
+        paramCount += 1;
+        if (name === undefined) {
+            this.name = `parameter${this.index}`;
+        }
+        else {
+            this.name = name;
+        }
+
+        this.varName = `p${this.index}`
+        this.defaultValue = defaultValue;
+        this.range = range;
+    }
+
+    getNodeStrings(): NodeStringsType {
+        return {definitions: [`${this.varName} = hslider("${this.name}[midi:ctrl ${this.index}", ${this.defaultValue}, ${this.range.min}, ${this.range.max}, ${this.range.step});`], processCode: this.varName};
+    }
+}
+
+let envCount = 0;
+class Envelope extends ValueNode {
+    adsr: {
+        a: ValueNode,
+        d: ValueNode,
+        s: ValueNode,
+        r: ValueNode
+    };
+    gate: ValueNode;
+
+    name: string;
+    varName: string;
+
+    constructor(
+            a = new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `env${envCount}a`),
+            d = new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `env${envCount}d`),
+            s = new Parameter(0.8, {min: 0, max: 1, step: 0.01}, `env${envCount}s`),
+            r = new Parameter(0.1, {min: 0, max: 10, step: 0.01}, `env${envCount}r`),
+            gate = new MIDIGate()) {
+        super();
+
+        this.adsr = {
+            a: a,
+            d: d,
+            s: s,
+            r: r
+        };
+        this.gate = gate;
+
+        this.name = `env${envCount}`;
+        this.varName = `e${envCount}`;
+        envCount += 1;
+    }
+
+    getNodeStrings(): NodeStringsType {
+        let aStrings = this.adsr.a.getNodeStrings(), dStrings = this.adsr.d.getNodeStrings(), sStrings = this.adsr.s.getNodeStrings(), rStrings = this.adsr.r.getNodeStrings();
+        let gateStrings = this.gate.getNodeStrings();
+
+        const defs = [...aStrings.definitions, ...dStrings.definitions, ...sStrings.definitions, ...rStrings.definitions, ...gateStrings.definitions];
+        const procCode = `en.adsr(${aStrings.processCode}, ${dStrings.processCode}, ${sStrings.processCode}, ${rStrings.processCode}, ${gateStrings.processCode})`;
+
+        return {definitions: defs, processCode: procCode};
     }
 }
 
@@ -61,10 +138,10 @@ class MathsNode extends ValueNode {
     }
 
     getNodeStrings(): NodeStringsType {
-        const [inputLTop, inputLValue] = this.inputL.getNodeStrings();
-        const [inputRTop, inputRValue] = this.inputR.getNodeStrings();
+        const inputLStrings = this.inputL.getNodeStrings();
+        const inputRStrings = this.inputR.getNodeStrings();
 
-        return [[...inputLTop, ...inputRTop], `${inputLValue}${this.operation}${inputRValue}`];
+        return {definitions: [...inputLStrings.definitions, ...inputRStrings.definitions], processCode: `${inputLStrings.processCode}${this.operation}${inputRStrings.processCode}`};
     }
 }
 
@@ -93,8 +170,8 @@ class Oscillator extends SynthNode {
     }
 
     getNodeStrings(): NodeStringsType {
-        const [freqTop, freqValue] = this.frequency.getNodeStrings();
-        return [freqTop, `${this.waveformMap[this.waveform]}(${freqValue})`];
+        const frequencyStrings = this.frequency.getNodeStrings();
+        return {definitions: frequencyStrings.definitions, processCode: `${this.waveformMap[this.waveform]}(${frequencyStrings.processCode})`};
     }
 }
 
@@ -111,9 +188,9 @@ class AudioOutput extends SynthNode {
 
         let topStrings: string[] = [];
         
-        inputStrings.map((nodeStrings) => topStrings.push(...nodeStrings[0]));
+        inputStrings.map((nodeStrings) => topStrings.push(...nodeStrings.definitions));
 
-        let processStrings = inputStrings.map(nodeStrings => nodeStrings[1]);
+        let processStrings = inputStrings.map(nodeStrings => nodeStrings.processCode);
 
         const graphString = `import("stdfaust.lib");
 
@@ -128,4 +205,4 @@ process = ${processStrings.join(' + ')};
     }
 }
 
-export {MIDIGate, MIDIFreq, MIDIGain, Constant, MathsNode, Oscillator, AudioOutput};
+export {MIDIGate, MIDIFreq, MIDIGain, Constant, Parameter, Envelope, MathsNode, Oscillator, AudioOutput};
