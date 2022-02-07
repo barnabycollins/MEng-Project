@@ -3,7 +3,7 @@ import {WebMidi, Input, MessageEvent} from "webmidi";
 import {code, polycode, midicode} from "./programs";
 import * as c from "./constructs";
 
-const constructedCode = new c.AudioOutput([new c.MathsNode('*', new c.Oscillator('triangle', new c.MIDIFreq()), new c.Envelope())]).getOutputString();
+const constructedCode = new c.AudioOutput([new c.MathsNode('*', new c.Oscillator('triangle', new c.MIDIFreq()), new c.Envelope(), new c.MIDIGain())]).getOutputString();
 
 console.log(constructedCode);
 
@@ -70,6 +70,8 @@ if (WebMidi.inputs.length < 1) {
   console.log("No MIDI input devices detected.");
 }
 else {
+  console.log(`Detected ${WebMidi.inputs.length} MIDI input devices:\n- ${WebMidi.inputs.map(x => x.name).join("\n- ")}`);
+
   WebMidi.inputs.forEach((device: Input) => {
     device.addListener("midimessage", (e: MessageEvent) => {
       node.midiMessage(e.message.data);

@@ -35,7 +35,7 @@ class MIDIFreq extends ValueNode {
 
 class MIDIGain extends ValueNode {
     getNodeStrings(): NodeStringsType {
-        return {definitions: [`midigain = hslider("gain", 0.5, 0, 0.5, 0.01);`], processCode: `midigain`};
+        return {definitions: [`midigain = hslider("gain", 0.5, 0, 1, 0.01);`], processCode: `midigain`};
     }
 }
 
@@ -79,7 +79,7 @@ class Parameter extends ValueNode {
     }
 
     getNodeStrings(): NodeStringsType {
-        return {definitions: [`${this.varName} = hslider("${this.name} (${this.varName})[midi:ctrl ${this.index}]", ${this.defaultValue}, ${this.range.min}, ${this.range.max}, ${this.range.step});`], processCode: this.varName};
+        return {definitions: [`${this.varName} = hslider("${this.name} (CC${this.index})[midi:ctrl ${this.index}]", ${this.defaultValue}, ${this.range.min}, ${this.range.max}, ${this.range.step});`], processCode: this.varName};
     }
 }
 
@@ -130,21 +130,23 @@ class Envelope extends ValueNode {
 
 class MathsNode extends ValueNode {
     operation: MathsOperationType;
-    inputL: ValueNode | SynthNode;
-    inputR: ValueNode | SynthNode;
+    inputs: (ValueNode | SynthNode)[];
 
-    constructor(operation: MathsOperationType, inputL: ValueNode | SynthNode, inputR: ValueNode | SynthNode) {
+    constructor(operation: MathsOperationType, ...inputs: (ValueNode | SynthNode)[]) {
         super();
         this.operation = operation;
-        this.inputL = inputL;
-        this.inputR = inputR;
+        this.inputs = inputs;
     }
 
     getNodeStrings(): NodeStringsType {
-        const inputLStrings = this.inputL.getNodeStrings();
-        const inputRStrings = this.inputR.getNodeStrings();
+        const inputStrings: NodeStringsType[] = this.inputs.map(input => input.getNodeStrings());
+        let defs: string[] = [];
+        inputStrings.map(strings => defs.push(...strings.definitions));
 
-        return {definitions: [...inputLStrings.definitions, ...inputRStrings.definitions], processCode: `${inputLStrings.processCode}${this.operation}${inputRStrings.processCode}`};
+        const processCodes = inputStrings.map(strings => strings.processCode);
+        console.log(processCodes);
+
+        return {definitions: defs, processCode: `${processCodes.join(this.operation)}`};
     }
 }
 
