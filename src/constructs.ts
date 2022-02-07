@@ -29,7 +29,7 @@ class MIDIFreq extends ValueNode {
         return {definitions: [
             `midifreq = hslider("freq[unit:Hz]", 440, 20, 20000, 1);`,
             `bend = ba.semi2ratio(hslider("pitchBend[midi:pitchwheel]", 0, -2, 2, 0.01));`
-        ], processCode: `midifreq*bend`};
+        ], processCode: `vgroup("Frequency", midifreq*bend)`};
     }
 }
 
@@ -122,7 +122,7 @@ class Envelope extends ValueNode {
         let gateStrings = this.gate.getNodeStrings();
 
         const defs = [...aStrings.definitions, ...dStrings.definitions, ...sStrings.definitions, ...rStrings.definitions, ...gateStrings.definitions];
-        const procCode = `en.adsr(${aStrings.processCode}, ${dStrings.processCode}, ${sStrings.processCode}, ${rStrings.processCode}, ${gateStrings.processCode})`;
+        const procCode = `vgroup("${this.name}", en.adsr(${aStrings.processCode}, ${dStrings.processCode}, ${sStrings.processCode}, ${rStrings.processCode}, ${gateStrings.processCode}))`;
 
         return {definitions: defs, processCode: procCode};
     }
