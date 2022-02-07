@@ -26,7 +26,10 @@ class MIDIGate extends ValueNode {
 
 class MIDIFreq extends ValueNode {
     getNodeStrings(): NodeStringsType {
-        return {definitions: [`midifreq = hslider("freq[unit:Hz]", 440, 20, 20000, 1);`], processCode: `midifreq`};
+        return {definitions: [
+            `midifreq = hslider("freq[unit:Hz]", 440, 20, 20000, 1);`,
+            `bend = ba.semi2ratio(hslider("pitchBend[midi:pitchwheel]", 0, -2, 2, 0.01));`
+        ], processCode: `midifreq*bend`};
     }
 }
 
@@ -194,7 +197,7 @@ class AudioOutput extends SynthNode {
 
         const graphString = `import("stdfaust.lib");
 
-// TOP STATEMENTS
+// DEFINITIONS
 ${topStrings.join('\n')}
 
 // PROCESS
