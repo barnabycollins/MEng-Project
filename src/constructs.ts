@@ -144,7 +144,6 @@ class MathsNode extends ValueNode {
         inputStrings.map(strings => defs.push(...strings.definitions));
 
         const processCodes = inputStrings.map(strings => strings.processCode);
-        console.log(processCodes);
 
         return {definitions: defs, processCode: `${processCodes.join(this.operation)}`};
     }
