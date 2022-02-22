@@ -26,8 +26,11 @@ function log(toLog: any): void {
 
 // SOUND OUTPUT
 
-// Connect to Web Audio
-const audioCtx = new window.AudioContext();
+// Connect to Web Audio, set up audio analyser node
+const WAContext = new window.AudioContext();
+
+const analyser = WAContext.createAnalyser();
+analyser.connect(WAContext.destination);
 
 // Enable Faust compiler; wait until it's ready
 const faust = new Faust({
@@ -39,11 +42,10 @@ await faust.ready;
 
 // Compile a new Web Audio node from faust code
 let node: FaustAudioWorkletNode;
-node = await faust.getNode(constructedCode, { audioCtx, useWorklet: true, voices: 4, args: { "-I": "libraries/" } }) as FaustAudioWorkletNode;
+node = await faust.getNode(constructedCode, { audioCtx: WAContext, useWorklet: true, voices: 4, args: { "-I": "libraries/" } }) as FaustAudioWorkletNode;
 
 // Connect the node's output to Web Audio
-node.connect(audioCtx.destination);
-
+node.connect(analyser);
 
 
 // UI CONTROLS
