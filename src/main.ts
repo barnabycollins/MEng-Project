@@ -2,6 +2,7 @@ import {Faust, FaustAudioWorkletNode} from "faust2webaudio";
 import {WebMidi, Input, MessageEvent} from "webmidi";
 import {code, polycode, midicode} from "./programs";
 import * as c from "./constructs";
+import Meyda, {MeydaFeaturesObject} from "meyda";
 
 const constructedCode = new c.AudioOutput([
   new c.MathsNode('*', 
@@ -22,15 +23,18 @@ function log(toLog: any): void {
   if (LOG) console.log("(DEBUG)", toLog);
 }
 
+function processAnalysisData(features: MeydaFeaturesObject) {
+  const resultSpan = document.getElementById("mfcc-results");
+  if (resultSpan !== null) {
+    resultSpan.innerHTML = `${features}`;
+  }
+}
 
 
 // SOUND OUTPUT
 
-// Connect to Web Audio, set up audio analyser node
-const WAContext = new window.AudioContext();
-
-const analyser = WAContext.createAnalyser();
-analyser.connect(WAContext.destination);
+// Connect to Web Audio
+const audioContext = new window.AudioContext();
 
 // Enable Faust compiler; wait until it's ready
 const faust = new Faust({
@@ -42,10 +46,21 @@ await faust.ready;
 
 // Compile a new Web Audio node from faust code
 let node: FaustAudioWorkletNode;
-node = await faust.getNode(constructedCode, { audioCtx: WAContext, useWorklet: true, voices: 4, args: { "-I": "libraries/" } }) as FaustAudioWorkletNode;
+node = await faust.getNode(constructedCode, { audioCtx: audioContext, useWorklet: true, voices: 4, args: { "-I": "libraries/" } }) as FaustAudioWorkletNode;
 
 // Connect the node's output to Web Audio
-node.connect(analyser);
+// @ts-ignore (connect does exist even though TypeScript says it doesn't)
+node.connect(audioContext.destination);
+
+const meydaAnalyser = Meyda.createMeydaAnalyzer({
+  "audioContext": audioContext,
+  "source": node,
+  "bufferSize": 512,
+  "featureExtractors": "mfcc",
+  "callback": processAnalysisData
+});
+
+meydaAnalyser.start();
 
 
 // UI CONTROLS
