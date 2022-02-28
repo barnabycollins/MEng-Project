@@ -89,11 +89,12 @@ window.addEventListener("message", (e) => {
 
 // Set up MIDI
 await WebMidi.enable();
-if (WebMidi.inputs.length < 1) {
+const midiDeviceCount = WebMidi.inputs.length;
+if (midiDeviceCount < 1) {
   console.log("No MIDI input devices detected.");
 }
 else {
-  console.log(`Detected ${WebMidi.inputs.length} MIDI input devices:\n- ${WebMidi.inputs.map(x => x.name).join("\n- ")}`);
+  console.log(`Detected ${midiDeviceCount} MIDI input device${midiDeviceCount != 1 ? "s" : ""}:\n- ${WebMidi.inputs.map(x => x.name).join("\n- ")}`);
 
   WebMidi.inputs.forEach((device: Input) => {
     device.addListener("midimessage", (e: MessageEvent) => {
