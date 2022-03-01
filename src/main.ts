@@ -2,7 +2,7 @@ import {Faust, FaustAudioWorkletNode} from "faust2webaudio";
 import {WebMidi, Input, MessageEvent} from "webmidi";
 import {code, polycode, midicode} from "./programs";
 import * as c from "./constructs";
-import Meyda, {MeydaFeaturesObject} from "meyda";
+import Meyda from "meyda";
 
 const constructedCode = new c.AudioOutput([
   new c.MathsNode('*', 
@@ -23,13 +23,30 @@ function log(toLog: any): void {
   if (LOG) console.log("(DEBUG)", toLog);
 }
 
-function processAnalysisData(features: MeydaFeaturesObject) {
+function processAnalysisData(features: number[]) {
   const resultSpan = document.getElementById("mfcc-results");
   if (resultSpan !== null) {
     resultSpan.innerHTML = `${features}`;
   }
 }
 
+function fitness(target: number[][], current: number[][]) {
+  const numWindows = target.length;
+  const numCoefficients = target[0].length;
+
+  let distance = 0;
+
+  for (let window = 0; window < numWindows; window++) {
+    let sum = 0;
+    for (let coeff = 0; coeff < numCoefficients; coeff++) {
+      sum += (target[window][coeff] - current[window][coeff])**2;
+    }
+    distance += Math.sqrt(sum);
+  }
+  distance /= numWindows;
+
+  return 1/(1+distance);
+}
 
 // SOUND OUTPUT
 
@@ -55,7 +72,7 @@ node.connect(audioContext.destination);
 const meydaAnalyser = Meyda.createMeydaAnalyzer({
   "audioContext": audioContext,
   "source": node,
-  "bufferSize": 512,
+  "bufferSize": 16384,
   "featureExtractors": "mfcc",
   "callback": processAnalysisData
 });
