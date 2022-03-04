@@ -75,7 +75,7 @@ function add_user_interface(topology: c.SynthNode) {
   ]);
 }
 
-async function compile_synth(topology: c.AudioOutput) {
+async function compile_synth(topology: c.AudioOutput): Promise<FaustAudioWorkletNode> {
   const constructedCode = topology.getOutputString();
 
   console.log(constructedCode);
@@ -137,7 +137,7 @@ await faust.ready;
 
 const baseTopology = generate_graph();
 const userTopology = add_user_interface(baseTopology);
-const node = compile_synth(userTopology);
+const node = await compile_synth(userTopology);
 
 function processAnalysisData(features: number[]) {
   const resultSpan = document.getElementById("mfcc-results");
