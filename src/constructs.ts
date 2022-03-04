@@ -7,6 +7,12 @@ type MathsOperationType = '+' | '-' | '*' | '/';
 type ParamRangeType = {min: number, max: number, step: number};
 
 class BaseNode {
+    carriesSound: boolean;
+
+    constructor() {
+        this.carriesSound = false;
+    }
+
     getNodeStrings(): NodeStringsType {
         return {definitions: [], processCode: ''};
     }
@@ -26,10 +32,7 @@ class MIDIGate extends ValueNode {
 
 class MIDIFreq extends ValueNode {
     getNodeStrings(): NodeStringsType {
-        return {definitions: [
-            `midifreq = hslider("freq[unit:Hz]", 440, 20, 20000, 1);`,
-            `bend = ba.semi2ratio(hslider("pitchBend[midi:pitchwheel]", 0, -2, 2, 0.01));`
-        ], processCode: `vgroup("Frequency", midifreq*bend)`};
+        return {definitions: [], processCode: `frequency`};
     }
 }
 
@@ -136,6 +139,7 @@ class MathsNode extends ValueNode {
         super();
         this.operation = operation;
         this.inputs = inputs;
+        this.carriesSound = inputs.some(input => input.carriesSound);
     }
 
     getNodeStrings(): NodeStringsType {
@@ -145,7 +149,7 @@ class MathsNode extends ValueNode {
 
         const processCodes = inputStrings.map(strings => strings.processCode);
 
-        return {definitions: defs, processCode: `${processCodes.join(this.operation)}`};
+        return {definitions: defs, processCode: `(${processCodes.join(this.operation)})`};
     }
 }
 
@@ -171,6 +175,7 @@ class Oscillator extends SynthNode {
         super();
         this.waveform = waveform;
         this.frequency = frequency;
+        this.carriesSound = true;
     }
 
     getNodeStrings(): NodeStringsType {
@@ -190,16 +195,20 @@ class AudioOutput extends SynthNode {
     getOutputString(): string {
         const inputStrings: NodeStringsType[] = this.inputs.map((input) => input.getNodeStrings());
 
-        let topStrings: string[] = [];
+        let definitions: string[] = [
+            `midifreq = hslider("freq[unit:Hz]", 440, 20, 20000, 1);`,
+            `bend = ba.semi2ratio(hslider("pitchBend[midi:pitchwheel]", 0, -2, 2, 0.01));`,
+            `frequency = vgroup("Frequency", midifreq*bend);`
+        ];
         
-        inputStrings.map((nodeStrings) => topStrings.push(...nodeStrings.definitions));
+        inputStrings.map((nodeStrings) => definitions.push(...nodeStrings.definitions));
 
         let processStrings = inputStrings.map(nodeStrings => nodeStrings.processCode);
 
-        const graphString = `import("stdfaust.lib");\n\n// DEFINITIONS\n${topStrings.join('\n')}\n\n// PROCESS\nprocess = ${processStrings.join(' + ')};`;
+        const graphString = `import("stdfaust.lib");\n\n// DEFINITIONS\n${definitions.join('\n')}\n\n// PROCESS\nprocess = ${processStrings.join(' + ')};`;
 
         return graphString;
     }
 }
 
-export {MIDIGate, MIDIFreq, MIDIGain, Constant, Parameter, Envelope, MathsNode, Oscillator, AudioOutput};
+export {MIDIGate, MIDIFreq, MIDIGain, Constant, Parameter, Envelope, MathsNode, Oscillator, AudioOutput, SynthNode, BaseNode};
