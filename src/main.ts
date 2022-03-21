@@ -12,41 +12,83 @@ function sample(array: any[]): any {
 }
 
 function randomParameter(): number {
-  return Math.random() * (20000 - 20) + 20
+  return Math.random() * (20000 - 20) + 20;
 }
 
-function generate(type: new (...args: any[]) => c.BaseNode): c.BaseNode {
+function generate(type: new (...args: any[]) => c.BaseNode, furtherArg?: any): c.BaseNode {
   if (type === c.Constant) {
     return new c.Constant(randomParameter());
   }
   else if (type === c.Parameter) {
+    const rangeZeroOne = furtherArg as boolean;
+    if (rangeZeroOne) {
+      return new c.Parameter(Math.random(), {min: 0, max: 1, step: 0.01});
+    }
     return new c.Parameter(randomParameter());
   }
   else if (type === c.MIDIFreq) {
     return new c.MIDIFreq();
   }
   else if (type === c.MathsNode) {
-    const operation = sample(['+', '-', '*', '/']);
+    const operation = "*";
     const numArguments = sample([2, 2, 2, 2, 2, 3, 3, 4]);
 
     let args = [];
-    const possibleArgs = [c.Oscillator, c.Parameter, c.MathsNode, c.MIDIFreq]
+    const possibleArgs = [c.Oscillator, c.Parameter, c.MathsNode, c.MIDIFreq];
+    
+    let choices = [];
 
     for (let i=0; i < numArguments; i++) {
       const choice = sample(possibleArgs);
+      choices.push(choice);
       if (choice === c.MIDIFreq) {
         possibleArgs.pop();
       }
-      args.push(generate(choice));
+    }
+
+    function couldCarrySound(input: new (...args: any[]) => c.BaseNode) {
+      return input === c.Oscillator || input === c.MathsNode;
+    }
+
+    choices.sort((a, b) => {
+      if (!couldCarrySound(a) && couldCarrySound(b)) {
+        return 1;
+      }
+      else if (couldCarrySound(a) && !couldCarrySound(b)) {
+        return -1;
+      }
+      return 0;
+    });
+
+    let carriesSound = false;
+
+    for (let choice of choices) {
+      let input;
+      if (choice === c.Oscillator || choice === c.MathsNode) {
+        input = generate(choice);
+        if (input.carriesSound) {
+          carriesSound = true;
+        }
+      }
+      else if (carriesSound) {
+        input = generate(c.Parameter, true);
+      }
+      else {
+        input = generate(choice);
+      }
+      args.push(input);
     }
 
     return new c.MathsNode(operation, ...args);
   }
   else if (type === c.Oscillator) {
     const waveform = sample(['sine', 'saw', 'square', 'triangle']);
-    const frequencyNode = sample([c.MathsNode, c.Oscillator, c.Parameter, c.MIDIFreq]);
-  
-    return new c.Oscillator(waveform, generate(frequencyNode));
+    const frequencyNodeType = sample([c.MathsNode, c.FrequencyModulator, c.Parameter, c.MIDIFreq, c.MIDIFreq]);
+    
+    return new c.Oscillator(waveform, generate(frequencyNodeType));
+  }
+  else if (type === c.FrequencyModulator) {
+    return new c.FrequencyModulator(undefined, undefined, generate(c.Oscillator));
   }
 
   throw new Error("You need to provide a valid node type to generate()!");
@@ -57,8 +99,10 @@ function generate_graph() {
 
   const rootNodeType = sample(possibleNodes);
   let rootNode = generate(rootNodeType);
+  console.log(`graphSize: ${rootNode.graphSize}`);
 
-  while (!rootNode.carriesSound) {
+  while (!rootNode.carriesSound || rootNode.graphSize > 50) {
+    console.log(`graphSize: ${rootNode.graphSize}`);
     rootNode = generate(rootNodeType);
   }
 
@@ -124,37 +168,42 @@ function log(toLog: any): void {
 
 // SOUND OUTPUT
 
-// Connect to Web Audio
-const audioContext = new window.AudioContext();
+let audioContext: AudioContext;
+let faust: Faust;
 
-// Enable Faust compiler; wait until it's ready
-const faust = new Faust({
-  debug: LOG,
-  wasmLocation: "src/libfaust/libfaust-wasm.wasm",
-  dataLocation: "src/libfaust/libfaust-wasm.data"
-});
-await faust.ready;
-
-const baseTopology = generate_graph();
-const userTopology = add_user_interface(baseTopology);
-const node = await compile_synth(userTopology);
-
-function processAnalysisData(features: number[]) {
-  const resultSpan = document.getElementById("mfcc-results");
-  if (resultSpan !== null) {
-    resultSpan.innerHTML = `${features}`;
+document.getElementById("resume-btn")?.addEventListener("click", async () => {
+  // Connect to Web Audio
+  audioContext = new window.AudioContext();
+  
+  // Enable Faust compiler; wait until it's ready
+  faust = new Faust({
+    debug: LOG,
+    wasmLocation: "src/libfaust/libfaust-wasm.wasm",
+    dataLocation: "src/libfaust/libfaust-wasm.data"
+  });
+  await faust.ready;
+  
+  const baseTopology = generate_graph();
+  const userTopology = add_user_interface(baseTopology);
+  const node = await compile_synth(userTopology);
+  
+  function processAnalysisData(features: number[]) {
+    const resultSpan = document.getElementById("mfcc-results");
+    if (resultSpan !== null) {
+      resultSpan.innerHTML = `${features}`;
+    }
   }
-}
-
-const meydaAnalyser = Meyda.createMeydaAnalyzer({
-  "audioContext": audioContext,
-  "source": node,
-  "bufferSize": 16384,
-  "featureExtractors": "mfcc",
-  "callback": processAnalysisData
+  
+  const meydaAnalyser = Meyda.createMeydaAnalyzer({
+    "audioContext": audioContext,
+    "source": node,
+    "bufferSize": 16384,
+    "featureExtractors": "mfcc",
+    "callback": processAnalysisData
+  });
+  
+  meydaAnalyser.start();
 });
-
-meydaAnalyser.start();
 
 function fitness(target: number[][], current: number[][]) {
   const numWindows = target.length;

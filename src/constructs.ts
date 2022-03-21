@@ -8,9 +8,11 @@ type ParamRangeType = {min: number, max: number, step: number};
 
 class BaseNode {
     carriesSound: boolean;
+    graphSize: number;
 
     constructor() {
         this.carriesSound = false;
+        this.graphSize = 1;
     }
 
     getNodeStrings(): NodeStringsType {
@@ -117,6 +119,14 @@ class Envelope extends ValueNode {
 
         this.name = `env${envCount}`;
         this.varName = `e${envCount}`;
+        
+        this.graphSize = 1 +
+            a.graphSize +
+            d.graphSize +
+            s.graphSize +
+            r.graphSize +
+            gate.graphSize;
+
         envCount += 1;
     }
 
@@ -140,6 +150,11 @@ class MathsNode extends ValueNode {
         this.operation = operation;
         this.inputs = inputs;
         this.carriesSound = inputs.some(input => input.carriesSound);
+        this.graphSize = 1;
+
+        for (let i of inputs) {
+            this.graphSize += i.graphSize;
+        }
     }
 
     getNodeStrings(): NodeStringsType {
@@ -176,11 +191,52 @@ class Oscillator extends SynthNode {
         this.waveform = waveform;
         this.frequency = frequency;
         this.carriesSound = true;
+
+        this.graphSize = 1 + frequency.graphSize;
     }
 
     getNodeStrings(): NodeStringsType {
         const frequencyStrings = this.frequency.getNodeStrings();
         return {definitions: frequencyStrings.definitions, processCode: `${this.waveformMap[this.waveform]}(${frequencyStrings.processCode})`};
+    }
+}
+
+let fmCount = 0;
+class FrequencyModulator extends SynthNode {
+    width: Parameter;
+    offset: Parameter;
+    input: SynthNode;
+    name: string;
+
+    constructor(
+            width = new Parameter(Math.random() * (20000 - 20) + 20, undefined, `fm${fmCount}width`),
+            offset = new Parameter(Math.random() * (20000 - 20) + 20, undefined, `fm${fmCount}offset`),
+            input: SynthNode
+        ) {
+        super();
+
+        this.width = width;
+        this.offset = offset
+        this.input = input;
+
+        this.name = `fm${fmCount}`;
+        this.graphSize = 1 +
+            width.graphSize +
+            offset.graphSize +
+            input.graphSize;
+        
+        fmCount += 1;
+    }
+
+    getNodeStrings(): NodeStringsType {
+        const inputStrings: NodeStringsType[] = [this.width, this.offset, this.input].map(input => input.getNodeStrings());
+        let defs: string[] = [];
+        inputStrings.map(strings => defs.push(...strings.definitions));
+
+        const processCodes = inputStrings.map(strings => strings.processCode);
+
+
+        return {definitions: defs, processCode: `((${processCodes[0]}*${processCodes[2]})+${processCodes[1]})`};
     }
 }
 
@@ -190,6 +246,11 @@ class AudioOutput extends SynthNode {
     constructor(inputs: SynthNode[]) {
         super();
         this.inputs = inputs;
+        this.graphSize = 0;
+
+        for (let i of inputs) {
+            this.graphSize += i.graphSize;
+        }
     }
     
     getOutputString(): string {
@@ -211,4 +272,4 @@ class AudioOutput extends SynthNode {
     }
 }
 
-export {MIDIGate, MIDIFreq, MIDIGain, Constant, Parameter, Envelope, MathsNode, Oscillator, AudioOutput, SynthNode, BaseNode};
+export {MIDIGate, MIDIFreq, MIDIGain, Constant, Parameter, Envelope, MathsNode, Oscillator, FrequencyModulator, AudioOutput, SynthNode, BaseNode};
