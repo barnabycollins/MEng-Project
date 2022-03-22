@@ -266,7 +266,7 @@ class AudioOutput extends SynthNode {
 
         let processStrings = inputStrings.map(nodeStrings => nodeStrings.processCode);
 
-        const graphString = `import("stdfaust.lib");\n\n// DEFINITIONS\n${definitions.join('\n')}\n\n// PROCESS\nprocess = ${processStrings.join(' + ')};`;
+        const graphString = `import("stdfaust.lib");\n\n// DEFINITIONS\n${definitions.join('\n')}\n\n// PROCESS\nprocess = (${processStrings.join(' + ')}) : fi.dcblocker : fi.lowpass(1, 20000);`;
 
         return graphString;
     }
