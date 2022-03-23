@@ -111,10 +111,12 @@ function generate_graph() {
 
 function add_user_interface(topology: c.SynthNode) {
   return new c.AudioOutput([
-    new c.MathsNode('*', 
-      topology,
-      new c.Envelope(),
-      new c.MIDIGain()
+    new c.LPFilter(
+      new c.MathsNode('*', 
+        topology,
+        new c.Envelope(),
+        new c.MIDIGain()
+      )
     )
   ]);
 }
@@ -123,6 +125,8 @@ async function compile_synth(topology: c.AudioOutput): Promise<FaustAudioWorklet
   const constructedCode = topology.getOutputString();
 
   console.log(constructedCode);
+
+  document.getElementById('code-area').innerText = constructedCode;
 
   // Compile a new Web Audio node from faust code
   let node: FaustAudioWorkletNode;

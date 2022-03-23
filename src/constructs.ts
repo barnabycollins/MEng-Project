@@ -65,6 +65,7 @@ class Parameter extends ValueNode {
     varName: string;
     defaultValue: number;
     range: ParamRangeType;
+    scale: "linear" | "log";
 
     constructor(defaultValue: number, range: ParamRangeType = {min: 0, max: 20000, step: 0.1}, name: undefined | string = undefined) {
         super();
@@ -78,13 +79,15 @@ class Parameter extends ValueNode {
             this.name = name;
         }
 
-        this.varName = `p${this.index}`
+        this.varName = `p${this.index}`;
         this.defaultValue = defaultValue;
         this.range = range;
+
+        this.scale = this.range.min <= 0 ? "linear" : "log";
     }
 
     getNodeStrings(): NodeStringsType {
-        return {definitions: [`${this.varName} = hslider("${this.name} (CC${this.index})[midi:ctrl ${this.index}]", ${this.defaultValue}, ${this.range.min}, ${this.range.max}, ${this.range.step});`], processCode: this.varName};
+        return {definitions: [`${this.varName} = hslider("[${paramCount}]${this.name} (CC${this.index})[midi:ctrl ${this.index}][scale:${this.scale}]", ${this.defaultValue}, ${this.range.min}, ${this.range.max}, ${this.range.step});`], processCode: this.varName};
     }
 }
 
@@ -240,6 +243,37 @@ class FrequencyModulator extends SynthNode {
     }
 }
 
+let lpFilterCount = 0;
+class LPFilter extends SynthNode {
+    input: SynthNode;
+    frequency: ValueNode;
+    q: ValueNode;
+
+    constructor(
+        input: SynthNode,
+        frequency = new Parameter(10000, {min: 20, max: 20000, step: 1}, `lp${lpFilterCount}freq`),
+        q = new Parameter(0.5, {min: 0.1, max: 30, step: 0.1}, `lp${lpFilterCount}q`)
+    ) {
+        super();
+        this.input = input;
+        this.frequency = frequency;
+        this.q = q;
+
+        this.graphSize = 1 + input.graphSize + frequency.graphSize + q.graphSize;
+        this.carriesSound = input.carriesSound;
+    }
+
+    getNodeStrings(): NodeStringsType {
+        const inputStrings: NodeStringsType[] = [this.input, this.frequency, this.q].map(input => input.getNodeStrings());
+        let defs: string[] = [];
+        inputStrings.map(strings => defs.push(...strings.definitions));
+
+        const processCodes = inputStrings.map(strings => strings.processCode);
+
+        return {definitions: defs, processCode: `(${processCodes[0]} : fi.resonlp(${processCodes[1]}, ${processCodes[2]}, 1))`}
+    }
+}
+
 class AudioOutput extends SynthNode {
     inputs: SynthNode[];
 
@@ -272,4 +306,4 @@ class AudioOutput extends SynthNode {
     }
 }
 
-export {MIDIGate, MIDIFreq, MIDIGain, Constant, Parameter, Envelope, MathsNode, Oscillator, FrequencyModulator, AudioOutput, SynthNode, BaseNode};
+export {MIDIGate, MIDIFreq, MIDIGain, Constant, Parameter, Envelope, MathsNode, Oscillator, FrequencyModulator, LPFilter, AudioOutput, SynthNode, BaseNode};

@@ -7,8 +7,10 @@
     <title>Vite App</title>
   </head>
   <body>
-    <div id="app"></div>
-    <iframe id="ui-frame" src="./faust-ui.html" height="700px" width="80%"></iframe>
+    <div id="main-panel" width="100%">
+      <iframe id="ui-frame" src="./faust-ui.html" height="700px" width="40%"></iframe>
+      <div id="code-area" style="font-family: monospace;">henlo</div>
+    </div>
     <script type="module" src="/src/constructs.ts"></script>
     <script type="module" src="/src/main.ts"></script>
     <span id="mfcc-results"></span>
