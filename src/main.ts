@@ -1,6 +1,5 @@
 import {Faust, FaustAudioWorkletNode} from "faust2webaudio";
 import {WebMidi, Input, MessageEvent} from "webmidi";
-import {code, polycode, midicode} from "./programs";
 import * as c from "./constructs";
 import Meyda from "meyda";
 
@@ -11,8 +10,19 @@ function sample(array: any[]): any {
 
 }
 
-function randomParameter(): number {
-  return Math.random() * (20000 - 20) + 20;
+const minLogValue = Math.log(20);
+const maxLogValue = Math.log(20000);
+const parameterLogScale = maxLogValue - minLogValue;
+function randomParameter(scale: "log" | "linear" = "log"): number {
+  if (scale == "log") {
+    // based on https://stackoverflow.com/a/846249/5094386
+    return Math.exp(minLogValue + parameterLogScale*Math.random());
+  }
+  else if (scale == "linear") {
+    return Math.random() * (20000 - 20) + 20;
+  }
+
+  return 0;
 }
 
 function generate(type: new (...args: any[]) => c.BaseNode, furtherArg?: any): c.BaseNode {
@@ -103,6 +113,7 @@ function generate_graph() {
 
   while (!rootNode.carriesSound || rootNode.graphSize > 50) {
     console.log(`graphSize: ${rootNode.graphSize}`);
+    c.resetCounts();
     rootNode = generate(rootNodeType);
   }
 
@@ -126,7 +137,10 @@ async function compile_synth(topology: c.AudioOutput): Promise<FaustAudioWorklet
 
   console.log(constructedCode);
 
-  document.getElementById('code-area').innerText = constructedCode;
+  const codeDiv = document.getElementById('code-area');
+  if (codeDiv !== null) {
+    codeDiv.innerText = constructedCode;
+  }
 
   // Compile a new Web Audio node from faust code
   let node: FaustAudioWorkletNode;

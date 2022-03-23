@@ -6,6 +6,13 @@ type MathsOperationType = '+' | '-' | '*' | '/';
 
 type ParamRangeType = {min: number, max: number, step: number};
 
+function resetCounts() {
+    paramCount = 0;
+    envCount = 0;
+    fmCount = 0;
+    lpFilterCount = 0;
+}
+
 class BaseNode {
     carriesSound: boolean;
     graphSize: number;
@@ -212,10 +219,10 @@ class FrequencyModulator extends SynthNode {
     name: string;
 
     constructor(
-            width = new Parameter(Math.random() * (20000 - 20) + 20, undefined, `fm${fmCount}width`),
-            offset = new Parameter(Math.random() * (20000 - 20) + 20, undefined, `fm${fmCount}offset`),
-            input: SynthNode
-        ) {
+        width = new Parameter(Math.random() * (20000 - 20) + 20, undefined, `fm${fmCount}width`),
+        offset = new Parameter(Math.random() * (20000 - 20) + 20, undefined, `fm${fmCount}offset`),
+        input: SynthNode
+    ) {
         super();
 
         this.width = width;
@@ -251,7 +258,7 @@ class LPFilter extends SynthNode {
 
     constructor(
         input: SynthNode,
-        frequency = new Parameter(10000, {min: 20, max: 20000, step: 1}, `lp${lpFilterCount}freq`),
+        frequency = new Parameter(20000, {min: 20, max: 20000, step: 1}, `lp${lpFilterCount}freq`),
         q = new Parameter(0.5, {min: 0.1, max: 30, step: 0.1}, `lp${lpFilterCount}q`)
     ) {
         super();
@@ -306,4 +313,4 @@ class AudioOutput extends SynthNode {
     }
 }
 
-export {MIDIGate, MIDIFreq, MIDIGain, Constant, Parameter, Envelope, MathsNode, Oscillator, FrequencyModulator, LPFilter, AudioOutput, SynthNode, BaseNode};
+export {resetCounts, MIDIGate, MIDIFreq, MIDIGain, Constant, Parameter, Envelope, MathsNode, Oscillator, FrequencyModulator, LPFilter, AudioOutput, SynthNode, BaseNode};
