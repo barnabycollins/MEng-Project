@@ -40,7 +40,7 @@ function generate(type: new (...args: any[]) => c.BaseNode, furtherArg?: any): c
     return new c.MIDIFreq();
   }
   else if (type === c.MathsNode) {
-    const operation = "*";
+    const operation = sample(["*", "+"]);
     const numArguments = sample([2, 2, 2, 2, 2, 3, 3, 4]);
 
     let args = [];
@@ -208,7 +208,7 @@ document.getElementById("resume-btn")?.addEventListener("click", async () => {
   function processAnalysisData(features: number[]) {
     const resultSpan = document.getElementById("mfcc-results");
     if (resultSpan !== null) {
-      resultSpan.innerHTML = `${features}`;
+      resultSpan.innerHTML = `${features.map((item) => Math.round(item*100)/100).join(", ")}`;
     }
   }
   
