@@ -25,77 +25,125 @@ function randomParameter(scale: "log" | "linear" = "log"): number {
   return 0;
 }
 
-function generate(type: new (...args: any[]) => c.BaseNode, furtherArg?: any): c.BaseNode {
+function generate(type: new (...args: any[]) => c.BaseNode, ...nodeArgs: any[]): c.BaseNode {
   if (type === c.Constant) {
-    return new c.Constant(randomParameter());
+    let value;
+    if (nodeArgs.length > 0) {
+      value = nodeArgs[0];
+    }
+    else {
+      value = randomParameter();
+    }
+    return new c.Constant(value);
   }
   else if (type === c.Parameter) {
-    const rangeZeroOne = furtherArg as boolean;
-    if (rangeZeroOne) {
-      return new c.Parameter(Math.random(), {min: 0, max: 1, step: 0.01});
+    let value, range, name;
+    if (nodeArgs.length > 0) {
+      value = nodeArgs[0];
+      
+      if (nodeArgs.length > 1) {
+        range = nodeArgs[1];
+
+        if (nodeArgs.length > 2) {
+          name = nodeArgs[2];
+        }
+      }
     }
-    return new c.Parameter(randomParameter());
+    else {
+      value = randomParameter();
+    }
+    return new c.Parameter(value, range, name);
   }
   else if (type === c.MIDIFreq) {
     return new c.MIDIFreq();
   }
   else if (type === c.MathsNode) {
-    const operation = sample(["*", "+"]);
-    const numArguments = sample([2, 2, 2, 2, 2, 3, 3, 4]);
+    let operation, args = [];
+    let givenArgs = false;
+    if (nodeArgs.length > 0) {
+      operation = nodeArgs[0];
 
-    let args = [];
-    const possibleArgs = [c.Oscillator, c.Parameter, c.MathsNode, c.MIDIFreq];
-    
-    let choices = [];
-
-    for (let i=0; i < numArguments; i++) {
-      const choice = sample(possibleArgs);
-      choices.push(choice);
-      if (choice === c.MIDIFreq) {
-        possibleArgs.pop();
+      if (nodeArgs.length > 1) {
+        givenArgs = true;
+        args = nodeArgs.slice(1);
       }
     }
-
-    function couldCarrySound(input: new (...args: any[]) => c.BaseNode) {
-      return input === c.Oscillator || input === c.MathsNode;
+    else {
+      operation = sample(["*", "+"]);
     }
 
-    choices.sort((a, b) => {
-      if (!couldCarrySound(a) && couldCarrySound(b)) {
-        return 1;
-      }
-      else if (couldCarrySound(a) && !couldCarrySound(b)) {
-        return -1;
-      }
-      return 0;
-    });
-
-    let carriesSound = false;
-
-    for (let choice of choices) {
-      let input;
-      if (choice === c.Oscillator || choice === c.MathsNode) {
-        input = generate(choice);
-        if (input.carriesSound) {
-          carriesSound = true;
+    if (!givenArgs) {
+      const numArguments = sample([2, 2, 2, 2, 2, 3, 3, 4]);
+  
+      const possibleArgs = [c.Oscillator, c.Parameter, c.MathsNode, c.MIDIFreq];
+      
+      let choices = [];
+  
+      for (let i=0; i < numArguments; i++) {
+        const choice = sample(possibleArgs);
+        choices.push(choice);
+        if (choice === c.MIDIFreq) {
+          possibleArgs.pop();
         }
       }
-      else if (carriesSound) {
-        input = generate(c.Parameter, true);
+  
+      function couldCarrySound(input: new (...args: any[]) => c.BaseNode) {
+        return input === c.Oscillator || input === c.MathsNode;
       }
-      else {
-        input = generate(choice);
+  
+      choices.sort((a, b) => {
+        if (!couldCarrySound(a) && couldCarrySound(b)) {
+          return 1;
+        }
+        else if (couldCarrySound(a) && !couldCarrySound(b)) {
+          return -1;
+        }
+        return 0;
+      });
+  
+      let carriesSound = false;
+  
+      for (let choice of choices) {
+        let input;
+        if (choice === c.Oscillator || choice === c.MathsNode) {
+          input = generate(choice);
+          if (input.carriesSound) {
+            carriesSound = true;
+          }
+        }
+        else if (carriesSound) {
+          input = generate(c.Parameter, Math.random(), {min: 0, max: 1, step: 0.01});
+        }
+        else {
+          input = generate(choice);
+        }
+        args.push(input);
       }
-      args.push(input);
     }
 
     return new c.MathsNode(operation, ...args);
   }
   else if (type === c.Oscillator) {
-    const waveform = sample(['sine', 'saw', 'square', 'triangle']);
-    const frequencyNodeType = sample([c.MathsNode, c.FrequencyModulator, c.Parameter, c.MIDIFreq, c.MIDIFreq]);
+    let waveform, frequencyNode;
+    let givenFrequencyNode = false;
+    if (nodeArgs.length > 0) {
+      waveform = nodeArgs[0];
+
+      if (nodeArgs.length > 1) {
+        givenFrequencyNode = true;
+        frequencyNode = nodeArgs[1];
+      }
+    }
+    else {
+      waveform = sample(['sine', 'saw', 'square', 'triangle']);
+    }
     
-    return new c.Oscillator(waveform, generate(frequencyNodeType));
+    if (!givenFrequencyNode) {
+      const frequencyNodeType = sample([c.MathsNode, c.FrequencyModulator, c.Parameter, c.MIDIFreq, c.MIDIFreq]);
+      frequencyNode = generate(frequencyNodeType);
+    }
+    
+    return new c.Oscillator(waveform, frequencyNode);
   }
   else if (type === c.FrequencyModulator) {
     return new c.FrequencyModulator(undefined, undefined, generate(c.Oscillator));
@@ -118,6 +166,81 @@ function generate_graph() {
   }
 
   return rootNode;
+}
+
+function mutate(node: c.BaseNode): c.BaseNode {
+  const REPLACE_CHANCE = 0.03;
+  const MUTATE_CHANCE = 0.1;
+
+  function replaceValue() {
+    const possibleReplacements = [c.MathsNode, c.Parameter, c.MIDIFreq, c.FrequencyModulator];
+    return generate(sample(possibleReplacements));
+  }
+
+  function replaceSynth() {
+    const possibleReplacements = [c.MathsNode, c.Oscillator, c.FrequencyModulator];
+    return generate(sample(possibleReplacements));
+  }
+
+  if (node instanceof c.Parameter) {
+    const randomValue = Math.random();
+
+    if (randomValue < REPLACE_CHANCE) {
+      return replaceValue();
+    }
+    else if (randomValue < MUTATE_CHANCE) {
+      return generate(c.Parameter, randomParameter(), node.range, node.name);
+    }
+    return node;
+  }
+  else if (node instanceof c.MIDIFreq) {
+    const randomValue = Math.random();
+
+    if (randomValue < REPLACE_CHANCE) {
+      return replaceValue();
+    }
+    else if (randomValue < MUTATE_CHANCE) {
+      return generate(c.MathsNode, "*", new c.Parameter(Math.random()*5, {min: 0, max: 5, step: 0.01}), generate(c.MIDIFreq));
+    }
+    return node;
+  }
+  else if (node instanceof c.MathsNode) {
+    const randomValue = Math.random();
+
+    if (randomValue < REPLACE_CHANCE) {
+      if (node.carriesSound) {
+        return replaceValue();
+      }
+      else {
+        return replaceSynth();
+      }
+    }
+    else if (randomValue < MUTATE_CHANCE) {
+      return generate(c.MathsNode, undefined, ...node.inputs.map(mutate));
+    }
+    return generate(c.MathsNode, node.operation, ...node.inputs.map(mutate));
+  }
+  else if (node instanceof c.Oscillator) {
+    const randomValue = Math.random();
+    
+    if (randomValue < REPLACE_CHANCE) {
+      return replaceSynth();
+    }
+    else if (randomValue < MUTATE_CHANCE) {
+      return generate(c.Oscillator, undefined, mutate(node.frequency));
+    }
+    return generate(c.Oscillator, node.waveform, mutate(node.frequency));
+  }
+  else if (node instanceof c.FrequencyModulator) {
+    const randomValue = Math.random();
+
+    if (randomValue < REPLACE_CHANCE) {
+      return replaceValue();
+    }
+    return generate(c.FrequencyModulator, mutate(node.width), mutate(node.offset), mutate(node.input));
+  }
+
+  throw new Error("You need to provide a valid node to mutate()!");
 }
 
 function add_user_interface(topology: c.SynthNode) {
@@ -202,6 +325,9 @@ document.getElementById("resume-btn")?.addEventListener("click", async () => {
   await faust.ready;
   
   const baseTopology = generate_graph();
+  console.log(baseTopology.getNodeStrings());
+  const mutatedTopology = mutate(baseTopology);
+  console.log(mutatedTopology.getNodeStrings());
   const userTopology = add_user_interface(baseTopology);
   const node = await compile_synth(userTopology);
   
