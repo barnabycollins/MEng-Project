@@ -28,7 +28,7 @@ function randomParameter(scale: "log" | "linear" = "log"): number {
 function generate(type: new (...args: any[]) => c.BaseNode, ...nodeArgs: any[]): c.BaseNode {
   if (type === c.Constant) {
     let value;
-    if (nodeArgs.length > 0) {
+    if (nodeArgs[0] !== undefined) {
       value = nodeArgs[0];
     }
     else {
@@ -37,22 +37,18 @@ function generate(type: new (...args: any[]) => c.BaseNode, ...nodeArgs: any[]):
     return new c.Constant(value);
   }
   else if (type === c.Parameter) {
-    let value, range, name;
-    if (nodeArgs.length > 0) {
+    let value, range;
+    if (nodeArgs[0] !== undefined) {
       value = nodeArgs[0];
       
-      if (nodeArgs.length > 1) {
+      if (nodeArgs[1] !== undefined) {
         range = nodeArgs[1];
-
-        if (nodeArgs.length > 2) {
-          name = nodeArgs[2];
-        }
       }
     }
     else {
       value = randomParameter();
     }
-    return new c.Parameter(value, range, name);
+    return new c.Parameter(value, range);
   }
   else if (type === c.MIDIFreq) {
     return new c.MIDIFreq();
@@ -60,10 +56,10 @@ function generate(type: new (...args: any[]) => c.BaseNode, ...nodeArgs: any[]):
   else if (type === c.MathsNode) {
     let operation, args = [];
     let givenArgs = false;
-    if (nodeArgs.length > 0) {
+    if (nodeArgs[0] !== undefined) {
       operation = nodeArgs[0];
 
-      if (nodeArgs.length > 1) {
+      if (nodeArgs[1] !== undefined) {
         givenArgs = true;
         args = nodeArgs.slice(1);
       }
@@ -126,10 +122,10 @@ function generate(type: new (...args: any[]) => c.BaseNode, ...nodeArgs: any[]):
   else if (type === c.Oscillator) {
     let waveform, frequencyNode;
     let givenFrequencyNode = false;
-    if (nodeArgs.length > 0) {
+    if (nodeArgs[0] !== undefined) {
       waveform = nodeArgs[0];
 
-      if (nodeArgs.length > 1) {
+      if (nodeArgs[1] !== undefined) {
         givenFrequencyNode = true;
         frequencyNode = nodeArgs[1];
       }
@@ -172,6 +168,8 @@ function mutate(node: c.BaseNode): c.BaseNode {
   const REPLACE_CHANCE = 0.03;
   const MUTATE_CHANCE = 0.1;
 
+  //c.resetCounts(); TODO fix
+
   function replaceValue() {
     const possibleReplacements = [c.MathsNode, c.Parameter, c.MIDIFreq, c.FrequencyModulator];
     return generate(sample(possibleReplacements));
@@ -189,9 +187,9 @@ function mutate(node: c.BaseNode): c.BaseNode {
       return replaceValue();
     }
     else if (randomValue < MUTATE_CHANCE) {
-      return generate(c.Parameter, randomParameter(), node.range, node.name);
+      return generate(c.Parameter, randomParameter(), node.range);
     }
-    return node;
+    return generate(c.Parameter, node.defaultValue, node.range);
   }
   else if (node instanceof c.MIDIFreq) {
     const randomValue = Math.random();
@@ -202,7 +200,7 @@ function mutate(node: c.BaseNode): c.BaseNode {
     else if (randomValue < MUTATE_CHANCE) {
       return generate(c.MathsNode, "*", new c.Parameter(Math.random()*5, {min: 0, max: 5, step: 0.01}), generate(c.MIDIFreq));
     }
-    return node;
+    return generate(c.MIDIFreq);
   }
   else if (node instanceof c.MathsNode) {
     const randomValue = Math.random();
@@ -328,6 +326,8 @@ document.getElementById("resume-btn")?.addEventListener("click", async () => {
   console.log(baseTopology.getNodeStrings());
   const mutatedTopology = mutate(baseTopology);
   console.log(mutatedTopology.getNodeStrings());
+  const twiceMutatedTopology = mutate(mutatedTopology);
+  console.log(twiceMutatedTopology.getNodeStrings());
   const userTopology = add_user_interface(baseTopology);
   const node = await compile_synth(userTopology);
   
