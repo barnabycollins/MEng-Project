@@ -48,6 +48,7 @@ function generate(type: new (...args: any[]) => c.BaseNode, ...nodeArgs: any[]):
     else {
       value = randomParameter();
     }
+
     return new c.Parameter(value, range);
   }
   else if (type === c.MIDIFreq) {
@@ -168,7 +169,7 @@ function mutate(node: c.BaseNode): c.BaseNode {
   const REPLACE_CHANCE = 0.03;
   const MUTATE_CHANCE = 0.1;
 
-  //c.resetCounts(); TODO fix
+  // c.resetCounts(); //TODO maybe fix
 
   function replaceValue() {
     const possibleReplacements = [c.MathsNode, c.Parameter, c.MIDIFreq, c.FrequencyModulator];

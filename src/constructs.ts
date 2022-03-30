@@ -74,7 +74,7 @@ class Parameter extends ValueNode {
     range: ParamRangeType;
     scale: "linear" | "log";
 
-    constructor(defaultValue: number, range: ParamRangeType = {min: 0, max: 20000, step: 0.1}, name: undefined | string = undefined) {
+    constructor(defaultValue: number, range: ParamRangeType = {min: 20, max: 20000, step: 0.1}, name: undefined | string = undefined) {
         super();
 
         this.index = paramCount;
