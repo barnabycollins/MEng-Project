@@ -41,7 +41,7 @@ class MIDIGate extends ValueNode {
 
 class MIDIFreq extends ValueNode {
     getNodeStrings(): NodeStringsType {
-        return {definitions: [], processCode: `ba.lin2LogGain((frequency-20)/19980)`};
+        return {definitions: [], processCode: `(frequency-20)/19980`};
     }
 }
 
@@ -213,7 +213,7 @@ class Oscillator extends SynthNode {
 
     getNodeStrings(): NodeStringsType {
         const frequencyStrings = this.frequency.getNodeStrings();
-        return {definitions: frequencyStrings.definitions, processCode: `${this.waveformMap[this.waveform]}(19980*ba.log2LinGain(${frequencyStrings.processCode})+20)`};
+        return {definitions: frequencyStrings.definitions, processCode: `${this.waveformMap[this.waveform]}(19980*${frequencyStrings.processCode}+20)`};
     }
 }
 
