@@ -41,7 +41,7 @@ class MIDIGate extends ValueNode {
 
 class MIDIFreq extends ValueNode {
     getNodeStrings(): NodeStringsType {
-        return {definitions: [], processCode: `frequency`};
+        return {definitions: [], processCode: `ba.lin2LogGain(frequency/20000)`};
     }
 }
 
@@ -54,9 +54,11 @@ class MIDIGain extends ValueNode {
 class Constant extends ValueNode {
     value: number;
 
-    constructor(value: number) {
+    constructor(value: number | undefined = undefined) {
         super();
-
+        if (value === undefined) {
+            value = Math.random();
+        }
         this.value = value;
     }
 
@@ -74,7 +76,7 @@ class Parameter extends ValueNode {
     range: ParamRangeType;
     scale: "linear" | "log";
 
-    constructor(defaultValue: number, range: ParamRangeType = {min: 20, max: 20000, step: 0.1}, name: undefined | string = undefined) {
+    constructor(defaultValue: number | undefined = undefined, range: ParamRangeType = {min: 0, max: 1, step: 0.001}, name: undefined | string = undefined) {
         super();
 
         this.index = paramCount;
@@ -87,14 +89,18 @@ class Parameter extends ValueNode {
         }
 
         this.varName = `p${this.index}`;
+        if (defaultValue === undefined) {
+            defaultValue = Math.random();
+        }
         this.defaultValue = defaultValue;
+
         this.range = range;
 
         this.scale = this.range.min <= 0 ? "linear" : "log";
     }
 
     getNodeStrings(): NodeStringsType {
-        return {definitions: [`${this.varName} = hslider("[${paramCount}]${this.name} (CC${this.index})[midi:ctrl ${this.index}][scale:${this.scale}]", ${this.defaultValue}, ${this.range.min}, ${this.range.max}, ${this.range.step});`], processCode: this.varName};
+        return {definitions: [`${this.varName} = hslider("[${this.index}]${this.name} (CC${this.index})[midi:ctrl ${this.index}][scale:${this.scale}]", ${this.defaultValue}, ${this.range.min}, ${this.range.max}, ${this.range.step});`], processCode: this.varName};
     }
 }
 
@@ -207,7 +213,7 @@ class Oscillator extends SynthNode {
 
     getNodeStrings(): NodeStringsType {
         const frequencyStrings = this.frequency.getNodeStrings();
-        return {definitions: frequencyStrings.definitions, processCode: `${this.waveformMap[this.waveform]}(${frequencyStrings.processCode})`};
+        return {definitions: frequencyStrings.definitions, processCode: `${this.waveformMap[this.waveform]}(20000*ba.log2LinGain(${frequencyStrings.processCode}))`};
     }
 }
 
@@ -219,8 +225,8 @@ class FrequencyModulator extends SynthNode {
     name: string;
 
     constructor(
-        width = new Parameter(Math.random() * (20000 - 20) + 20, undefined, `fm${fmCount}width`),
-        offset = new Parameter(Math.random() * (20000 - 20) + 20, undefined, `fm${fmCount}offset`),
+        width = new Parameter(undefined, undefined, `fm${fmCount}width`),
+        offset = new Parameter(undefined, undefined, `fm${fmCount}offset`),
         input: SynthNode
     ) {
         super();

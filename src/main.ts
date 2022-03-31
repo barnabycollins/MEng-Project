@@ -31,9 +31,7 @@ function generate(type: new (...args: any[]) => c.BaseNode, ...nodeArgs: any[]):
     if (nodeArgs[0] !== undefined) {
       value = nodeArgs[0];
     }
-    else {
-      value = randomParameter();
-    }
+
     return new c.Constant(value);
   }
   else if (type === c.Parameter) {
@@ -44,9 +42,6 @@ function generate(type: new (...args: any[]) => c.BaseNode, ...nodeArgs: any[]):
       if (nodeArgs[1] !== undefined) {
         range = nodeArgs[1];
       }
-    }
-    else {
-      value = randomParameter();
     }
 
     return new c.Parameter(value, range);
@@ -85,7 +80,7 @@ function generate(type: new (...args: any[]) => c.BaseNode, ...nodeArgs: any[]):
       }
   
       function couldCarrySound(input: new (...args: any[]) => c.BaseNode) {
-        return input === c.Oscillator || input === c.MathsNode;
+        return input === c.Oscillator || input === c.MathsNode || input === c.FrequencyModulator;
       }
   
       choices.sort((a, b) => {
@@ -109,7 +104,7 @@ function generate(type: new (...args: any[]) => c.BaseNode, ...nodeArgs: any[]):
           }
         }
         else if (carriesSound) {
-          input = generate(c.Parameter, Math.random(), {min: 0, max: 1, step: 0.01});
+          input = generate(c.Parameter, Math.random());
         }
         else {
           input = generate(choice);
@@ -188,9 +183,9 @@ function mutate(node: c.BaseNode): c.BaseNode {
       return replaceValue();
     }
     else if (randomValue < MUTATE_CHANCE) {
-      return generate(c.Parameter, randomParameter(), node.range);
+      return generate(c.Parameter);
     }
-    return generate(c.Parameter, node.defaultValue, node.range);
+    return generate(c.Parameter, node.defaultValue);
   }
   else if (node instanceof c.MIDIFreq) {
     const randomValue = Math.random();
@@ -324,11 +319,13 @@ document.getElementById("resume-btn")?.addEventListener("click", async () => {
   await faust.ready;
   
   const baseTopology = generate_graph();
+  console.log(baseTopology);
   console.log(baseTopology.getNodeStrings());
   const mutatedTopology = mutate(baseTopology);
   console.log(mutatedTopology.getNodeStrings());
   const twiceMutatedTopology = mutate(mutatedTopology);
   console.log(twiceMutatedTopology.getNodeStrings());
+  
   const userTopology = add_user_interface(baseTopology);
   const node = await compile_synth(userTopology);
   
