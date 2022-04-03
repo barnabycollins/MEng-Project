@@ -38,20 +38,36 @@ for (let i = 0; i < contextCount; i++) {
         ${mfccBars}
       </div>
       <div class="control-box">
-        <button id="code-show-${i}">Show code</button>
+        <button id="process-code-show-${i}">Show process code</button>
+        <button id="full-code-show-${i}">Show full code</button>
         <button id="ctx-select-${i}">Select context</button>
+        <button id="stop-${i}">Stop note(s)</button>
       </div>
     </div>
   `;
   panel.innerHTML += panelContent;
 }
 
+const selectContext = (value?: number) => {
+  if (value === undefined) value = (selectedContext + 1) % contextCount;
+  selectedContext = value;
+}
+
+const stopContext = (contextId: number) => {
+  // sends MIDI All Notes Off message (11010000 01111011 00000000)
+  //                                   = 176    = 123    = 0
+  contexts[contextId].webAudioNode.midiMessage([176, 123, 0]);
+}
+
 for (let i = 0; i < contextCount; i++) {
-  console.log(document.getElementById(`ctx-select-${i}`));
   document.getElementById(`ctx-select-${i}`)?.addEventListener("click", () => selectContext(i));
+  document.getElementById(`stop-${i}`)?.addEventListener("click", () => stopContext(i));
 }
 
 document.getElementById("resume-btn")?.addEventListener("click", async () => {
+  (document.getElementById("main-panel") as HTMLDivElement).style.display = "flex";
+  (document.getElementById("btn-container") as HTMLDivElement).style.display = "none";
+
   // Connect to Web Audio
   audioContext = new window.AudioContext();
   
@@ -71,13 +87,6 @@ document.getElementById("resume-btn")?.addEventListener("click", async () => {
     await i.compile(faust, audioContext);
   }
 });
-
-const selectContext = (value?: number) => {
-  if (value === undefined) value = (selectedContext + 1) % contextCount;
-  selectedContext = value;
-}
-
-document.getElementById("cycle-btn")?.addEventListener('click', () => selectContext());
 
 
 

@@ -328,8 +328,9 @@ class SynthContext {
   mfccBars: HTMLDivElement[];
 
   topology!: SynthNode;
+  processCode: string;
   userTopology!: AudioOutput;
-  faustCode: string;
+  fullCode: string;
   webAudioNode!: FaustAudioWorkletNode;
 
   paramCount: number;
@@ -345,7 +346,7 @@ class SynthContext {
     this.envCount = 0;
     this.fmCount = 0;
     this.lpFilterCount = 0;
-    this.faustCode = ""; // populated on compile
+    this.fullCode = ""; // populated on compile
 
     const mfccCoefficientCount = 13;
 
@@ -353,7 +354,8 @@ class SynthContext {
     for (let i = 0; i < mfccCoefficientCount; i++) {
       this.mfccBars.push(document.getElementById(`bar-${index}-${i}`) as HTMLDivElement);
     }
-    document.getElementById(`code-show-${index}`)?.addEventListener("click", this.showCode.bind(this));
+    document.getElementById(`process-code-show-${index}`)?.addEventListener("click", this.showProcessCode.bind(this));
+    document.getElementById(`full-code-show-${index}`)?.addEventListener("click", this.showFullCode.bind(this));
 
     if (topology !== undefined) {
       this.topology = topology;
@@ -361,6 +363,8 @@ class SynthContext {
     else {
       this.generateSynth();
     }
+
+    this.processCode = this.topology.getNodeStrings().processCode;
 
     this.addOutputInterface();
   }
@@ -377,10 +381,8 @@ class SynthContext {
   
     const rootNodeType = sample(possibleNodes);
     let rootNode = this.generate(rootNodeType);
-    console.log(`graphSize: ${rootNode.graphSize}`);
   
     while (!rootNode.carriesSound || rootNode.graphSize > 50) {
-      console.log(`graphSize: ${rootNode.graphSize}`);
       this.resetCounts();
       rootNode = this.generate(rootNodeType);
     }
@@ -409,8 +411,7 @@ class SynthContext {
   async compile(faust: Faust, context: AudioContext) {
     const constructedCode = this.userTopology.getOutputString();
 
-    this.faustCode = constructedCode;
-    console.log(`ctx${this.index}: ${this.faustCode}`);
+    this.fullCode = constructedCode;
 
     // Compile a new Web Audio node from faust code
     let node: FaustAudioWorkletNode;
@@ -460,9 +461,12 @@ class SynthContext {
     }
   }
 
-  showCode() {
-    console.log(`bam ${this.faustCode}`);
-    (document.getElementById("code-area") as HTMLDivElement).innerText = this.faustCode;
+  showProcessCode() {
+    (document.getElementById("code-area") as HTMLDivElement).innerText = this.processCode;
+  }
+
+  showFullCode() {
+    (document.getElementById("code-area") as HTMLDivElement).innerText = this.fullCode;
   }
 
   generate(type: new (...args: any[]) => BaseNode, ...nodeArgs: any[]): BaseNode {
