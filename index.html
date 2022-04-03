@@ -9,12 +9,12 @@
   </head>
   <body>
     <div id="main-panel">
-      <iframe id="ui-frame" src="./faust-ui.html" height="700px" width="40%"></iframe>
-      <div id="code-area" style="font-family: monospace;"></div>
+      <!-- populated by JS -->
     </div>
     <button id="resume-btn">Run</button>
+    <button id="cycle-btn">Cycle context</button>
     <br>
-    <span id="mfcc-results"></span>
+    <div id="code-area"></div>
     <script type="module" src="/src/constructs.ts"></script>
     <script type="module" src="/src/main.ts"></script>
   </body>

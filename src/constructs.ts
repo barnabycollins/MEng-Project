@@ -1,3 +1,5 @@
+import { Faust, FaustAudioWorkletNode } from "faust2webaudio";
+import Meyda from "meyda";
 
 type WaveformType = 'sine' | 'saw' | 'square' | 'triangle';
 
@@ -5,13 +7,6 @@ type NodeStringsType = {definitions: string[], processCode: string};
 type MathsOperationType = '+' | '-' | '*' | '/';
 
 type ParamRangeType = {min: number, max: number, step: number};
-
-function resetCounts() {
-	paramCount = 0;
-	envCount = 0;
-	fmCount = 0;
-	lpFilterCount = 0;
-}
 
 class BaseNode {
 	carriesSound: boolean;
@@ -100,7 +95,7 @@ class Parameter extends ValueNode {
 	}
 
 	getNodeStrings(): NodeStringsType {
-		return {definitions: [`${this.varName} = hslider("[${this.index}]${this.name} (CC${this.index})[midi:ctrl ${this.index}][scale:${this.scale}]", ${this.defaultValue}, ${this.range.min}, ${this.range.max}, ${this.range.step});`], processCode: this.varName};
+		return {definitions: [`${this.varName} = hslider("[${this.index}]${this.name} (CC${this.index})[midi:ctrl ${this.index}][scale:${this.scale}]", ${this.defaultValue}, ${this.range.min}, ${this.range.max}, ${this.range.step}) : si.smoo;`], processCode: this.varName};
 	}
 }
 
@@ -118,11 +113,12 @@ class Envelope extends ValueNode {
 	varName: string;
 
 	constructor(
-			a = new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `env${envCount}a`),
-			d = new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `env${envCount}d`),
-			s = new Parameter(0.8, {min: 0, max: 1, step: 0.01}, `env${envCount}s`),
-			r = new Parameter(0.1, {min: 0, max: 10, step: 0.01}, `env${envCount}r`),
-			gate = new MIDIGate()) {
+    a = new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `env${envCount}a`),
+    d = new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `env${envCount}d`),
+    s = new Parameter(0.8, {min: 0, max: 1, step: 0.01}, `env${envCount}s`),
+    r = new Parameter(0.1, {min: 0, max: 10, step: 0.01}, `env${envCount}r`),
+    gate = new MIDIGate()
+  ) {
 		super();
 
 		this.adsr = {
@@ -319,4 +315,349 @@ class AudioOutput extends SynthNode {
 	}
 }
 
-export {resetCounts, MIDIGate, MIDIFreq, MIDIGain, Constant, Parameter, Envelope, MathsNode, Oscillator, FrequencyModulator, LPFilter, AudioOutput, SynthNode, BaseNode};
+
+
+function sample(array: any[]): any {
+  return array[~~(Math.random() * array.length)];
+}
+
+class SynthContext {
+  index: number;
+  uiFrame: HTMLIFrameElement;
+
+  mfccBars: HTMLDivElement[];
+
+  topology!: SynthNode;
+  userTopology!: AudioOutput;
+  faustCode: string;
+  webAudioNode!: FaustAudioWorkletNode;
+
+  paramCount: number;
+  envCount: number;
+  fmCount: number;
+  lpFilterCount: number;
+
+  constructor(index: number, topology?: SynthNode) {
+    this.index = index;
+    this.uiFrame = document.getElementById(`ui${index}`) as HTMLIFrameElement;
+
+    this.paramCount = 0;
+    this.envCount = 0;
+    this.fmCount = 0;
+    this.lpFilterCount = 0;
+    this.faustCode = ""; // populated on compile
+
+    const mfccCoefficientCount = 13;
+
+    this.mfccBars = [];
+    for (let i = 0; i < mfccCoefficientCount; i++) {
+      this.mfccBars.push(document.getElementById(`bar-${index}-${i}`) as HTMLDivElement);
+    }
+    document.getElementById(`code-show-${index}`)?.addEventListener("click", this.showCode.bind(this));
+
+    if (topology !== undefined) {
+      this.topology = topology;
+    }
+    else {
+      this.generateSynth();
+    }
+
+    this.addOutputInterface();
+  }
+
+  resetCounts() {
+    this.paramCount = 0;
+    this.envCount = 0;
+    this.fmCount = 0;
+    this.lpFilterCount = 0;
+  }
+  
+  generateSynth() {
+    const possibleNodes = [MathsNode, Oscillator];
+  
+    const rootNodeType = sample(possibleNodes);
+    let rootNode = this.generate(rootNodeType);
+    console.log(`graphSize: ${rootNode.graphSize}`);
+  
+    while (!rootNode.carriesSound || rootNode.graphSize > 50) {
+      console.log(`graphSize: ${rootNode.graphSize}`);
+      this.resetCounts();
+      rootNode = this.generate(rootNodeType);
+    }
+  
+    this.topology = rootNode;
+  }
+
+  mutateSynth() {
+    this.resetCounts();
+    this.topology = this.mutate(this.topology);
+    this.addOutputInterface();
+  }
+
+  addOutputInterface() {
+    this.userTopology = new AudioOutput([
+      new LPFilter(
+        new MathsNode('*', 
+          this.topology,
+          new Envelope(),
+          new MIDIGain()
+        )
+      )
+    ]);
+  }
+
+  async compile(faust: Faust, context: AudioContext) {
+    const constructedCode = this.userTopology.getOutputString();
+
+    this.faustCode = constructedCode;
+    console.log(`ctx${this.index}: ${this.faustCode}`);
+
+    // Compile a new Web Audio node from faust code
+    let node: FaustAudioWorkletNode;
+    node = await faust.getNode(constructedCode, { audioCtx: context, useWorklet: true, voices: 4, args: { "-I": "libraries/" } }) as FaustAudioWorkletNode;
+    
+    // Connect the node's output to Web Audio
+    // @ts-ignore (connect does exist even though TypeScript says it doesn't)
+    node.connect(context.destination);
+
+
+    // UI CONTROLS
+    
+    // Find UI iframe
+    const uiWindow = this.uiFrame.contentWindow as Window;
+    
+    // Make the UI update when parameters change on the backend (eg, when a control is modulated by MIDI)
+    node.setOutputParamHandler((path: string, value: number) => {
+      const msg = {path, value, type: "param"};
+      uiWindow.postMessage(msg, "*");
+    });
+    
+    // Send node parameters to the UI for display
+    const msg = {type: "ui", ui: node.getUI()};
+    uiWindow.postMessage(msg, "*");
+    
+    // Add a listener for when we receive control changes from the iframe
+    window.addEventListener("message", (e) => {
+      node.setParamValue(e.data.path, e.data.value);
+    });
+  
+    const meydaAnalyser = Meyda.createMeydaAnalyzer({
+      "audioContext": context,
+      "source": node,
+      "bufferSize": 512,
+      "featureExtractors": "mfcc",
+      "callback": this.mfccCallback.bind(this)
+    });
+    
+    meydaAnalyser.start();
+    
+    this.webAudioNode = node;
+  }
+
+  mfccCallback(values: number[]) {
+    for (let i = 0; i < values.length; i++) {
+      this.mfccBars[i].style.height = `${Math.min(values[i]/2, 100)}px`;
+    }
+  }
+
+  showCode() {
+    console.log(`bam ${this.faustCode}`);
+    (document.getElementById("code-area") as HTMLDivElement).innerText = this.faustCode;
+  }
+
+  generate(type: new (...args: any[]) => BaseNode, ...nodeArgs: any[]): BaseNode {
+    if (type === Constant) {
+      let value;
+      if (nodeArgs[0] !== undefined) {
+        value = nodeArgs[0];
+      }
+  
+      return new Constant(value);
+    }
+    else if (type === Parameter) {
+      let value, range;
+      if (nodeArgs[0] !== undefined) {
+        value = nodeArgs[0];
+        
+        if (nodeArgs[1] !== undefined) {
+          range = nodeArgs[1];
+        }
+      }
+  
+      return new Parameter(value, range);
+    }
+    else if (type === MIDIFreq) {
+      return new MIDIFreq();
+    }
+    else if (type === MathsNode) {
+      let operation, args = [];
+      let givenArgs = false;
+      if (nodeArgs[0] !== undefined) {
+        operation = nodeArgs[0];
+  
+        if (nodeArgs[1] !== undefined) {
+          givenArgs = true;
+          args = nodeArgs.slice(1);
+        }
+      }
+      else {
+        operation = sample(["*", "+"]);
+      }
+  
+      if (!givenArgs) {
+        const numArguments = sample([2, 2, 2, 2, 2, 3, 3, 4]);
+    
+        const possibleArgs = [Oscillator, Parameter, MathsNode, MIDIFreq];
+        
+        let choices = [];
+    
+        for (let i=0; i < numArguments; i++) {
+          const choice = sample(possibleArgs);
+          choices.push(choice);
+          if (choice === MIDIFreq) {
+            possibleArgs.pop();
+          }
+        }
+    
+        function couldCarrySound(input: new (...args: any[]) => BaseNode) {
+          return input === Oscillator || input === MathsNode || input === FrequencyModulator;
+        }
+    
+        choices.sort((a, b) => {
+          if (!couldCarrySound(a) && couldCarrySound(b)) {
+            return 1;
+          }
+          else if (couldCarrySound(a) && !couldCarrySound(b)) {
+            return -1;
+          }
+          return 0;
+        });
+    
+        let carriesSound = false;
+    
+        for (let choice of choices) {
+          let input;
+          if (choice === Oscillator || choice === MathsNode) {
+            input = this.generate(choice);
+            if (input.carriesSound) {
+              carriesSound = true;
+            }
+          }
+          else if (carriesSound) {
+            input = this.generate(Parameter, Math.random());
+          }
+          else {
+            input = this.generate(choice);
+          }
+          args.push(input);
+        }
+      }
+  
+      return new MathsNode(operation, ...args);
+    }
+    else if (type === Oscillator) {
+      let waveform, frequencyNode;
+      let givenFrequencyNode = false;
+      if (nodeArgs[0] !== undefined) {
+        waveform = nodeArgs[0];
+  
+        if (nodeArgs[1] !== undefined) {
+          givenFrequencyNode = true;
+          frequencyNode = nodeArgs[1];
+        }
+      }
+      else {
+        waveform = sample(['sine', 'saw', 'square', 'triangle']);
+      }
+      
+      if (!givenFrequencyNode) {
+        const frequencyNodeType = sample([MathsNode, FrequencyModulator, Parameter, MIDIFreq, MIDIFreq]);
+        frequencyNode = this.generate(frequencyNodeType);
+      }
+      
+      return new Oscillator(waveform, frequencyNode);
+    }
+    else if (type === FrequencyModulator) {
+      return new FrequencyModulator(undefined, undefined, this.generate(Oscillator));
+    }
+  
+    throw new Error("You need to provide a valid node type to this.generate()!");
+  }
+
+  mutate(node: BaseNode): BaseNode {
+    const REPLACE_CHANCE = 0.03;
+    const MUTATE_CHANCE = 0.1;
+
+    const replaceValue = () => {
+      const possibleReplacements = [MathsNode, Parameter, MIDIFreq, FrequencyModulator];
+      return this.generate(sample(possibleReplacements));
+    }
+
+    const replaceSynth = () => {
+      const possibleReplacements = [MathsNode, Oscillator];
+      return this.generate(sample(possibleReplacements));
+    }
+
+    if (node instanceof Parameter) {
+      const randomValue = Math.random();
+
+      if (randomValue < REPLACE_CHANCE) {
+        return replaceValue();
+      }
+      else if (randomValue < MUTATE_CHANCE) {
+        return this.generate(Parameter);
+      }
+      return this.generate(Parameter, node.defaultValue);
+    }
+    else if (node instanceof MIDIFreq) {
+      const randomValue = Math.random();
+
+      if (randomValue < REPLACE_CHANCE) {
+        return replaceValue();
+      }
+      else if (randomValue < MUTATE_CHANCE) {
+        return this.generate(MathsNode, "*", new Parameter(Math.random()*5, {min: 0, max: 5, step: 0.01}), this.generate(MIDIFreq));
+      }
+      return this.generate(MIDIFreq);
+    }
+    else if (node instanceof MathsNode) {
+      const randomValue = Math.random();
+
+      if (randomValue < REPLACE_CHANCE) {
+        if (node.carriesSound) {
+          return replaceValue();
+        }
+        else {
+          return replaceSynth();
+        }
+      }
+      else if (randomValue < MUTATE_CHANCE) {
+        return this.generate(MathsNode, undefined, ...node.inputs.map(this.mutate));
+      }
+      return this.generate(MathsNode, node.operation, ...node.inputs.map(this.mutate));
+    }
+    else if (node instanceof Oscillator) {
+      const randomValue = Math.random();
+      
+      if (randomValue < REPLACE_CHANCE) {
+        return replaceSynth();
+      }
+      else if (randomValue < MUTATE_CHANCE) {
+        return this.generate(Oscillator, undefined, this.mutate(node.frequency));
+      }
+      return this.generate(Oscillator, node.waveform, this.mutate(node.frequency));
+    }
+    else if (node instanceof FrequencyModulator) {
+      const randomValue = Math.random();
+
+      if (randomValue < REPLACE_CHANCE) {
+        return replaceValue();
+      }
+      return this.generate(FrequencyModulator, this.mutate(node.width), this.mutate(node.offset), this.mutate(node.input));
+    }
+
+    throw new Error("You need to provide a valid node to mutate()!");
+  }
+}
+
+export {MIDIGate, MIDIFreq, MIDIGain, Constant, Parameter, Envelope, MathsNode, Oscillator, FrequencyModulator, LPFilter, AudioOutput, SynthNode, BaseNode, SynthContext};
