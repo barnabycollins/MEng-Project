@@ -62,7 +62,7 @@ class Constant extends ValueNode {
 	}
 }
 
-let paramCount = 0;
+let paramCount = 10;
 class Parameter extends ValueNode {
 	index: number;
 	name: string;
@@ -71,11 +71,12 @@ class Parameter extends ValueNode {
 	range: ParamRangeType;
 	scale: "linear" | "log";
 
-	constructor(defaultValue: number | undefined = undefined, range: ParamRangeType = {min: 0, max: 1, step: 0.001}, name: undefined | string = undefined) {
+	constructor(defaultValue: number | undefined = undefined, range: ParamRangeType = {min: 0, max: 1, step: 0.001}, name?: string) {
 		super();
 
-		this.index = paramCount;
-		paramCount += 1;
+    this.index = paramCount;
+    paramCount += 1;
+
 		if (name === undefined) {
 			this.name = `parameter${this.index}`;
 		}
@@ -114,7 +115,7 @@ class Envelope extends ValueNode {
 
 	constructor(
     a = new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `env${envCount}a`),
-    d = new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `env${envCount}d`),
+    d = new Parameter(0.3, {min: 0, max: 10, step: 0.01}, `env${envCount}d`),
     s = new Parameter(0.8, {min: 0, max: 1, step: 0.01}, `env${envCount}s`),
     r = new Parameter(0.1, {min: 0, max: 10, step: 0.01}, `env${envCount}r`),
     gate = new MIDIGate()
@@ -401,9 +402,16 @@ class SynthContext {
       new LPFilter(
         new MathsNode('*', 
           this.topology,
-          new Envelope(),
+          new Envelope(
+            new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_A`),
+            new Parameter(0.3, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_D`),
+            new Parameter(0.8, {min: 0, max: 1, step: 0.01}, `MAIN_ENV_S`),
+            new Parameter(0.1, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_R`)
+          ),
           new MIDIGain()
-        )
+        ),
+        new Parameter(20000, {min: 20, max: 20000, step: 1}, `MAIN_LP_FREQ`),
+        new Parameter(0.5, {min: 0.1, max: 30, step: 0.1}, `MAIN_LP_Q`)
       )
     ]);
   }
@@ -453,11 +461,13 @@ class SynthContext {
     meydaAnalyser.start();
     
     this.webAudioNode = node;
+
+    this.measureMFCC();
   }
 
   mfccCallback(values: number[]) {
     for (let i = 0; i < values.length; i++) {
-      this.mfccBars[i].style.height = `${Math.min(values[i]/2, 100)}px`;
+      this.mfccBars[i].style.height = `${Math.min(values[i], 100)}px`;
     }
   }
 
@@ -467,6 +477,26 @@ class SynthContext {
 
   showFullCode() {
     (document.getElementById("code-area") as HTMLDivElement).innerText = this.fullCode;
+  }
+
+  measureMFCC() {
+    const parameters = this.webAudioNode.getParams();
+
+    const env_a = parameters.filter(i => i.includes('MAIN_ENV_A'))[0];
+    const env_d = parameters.filter(i => i.includes('MAIN_ENV_D'))[0];
+    const env_s = parameters.filter(i => i.includes('MAIN_ENV_S'))[0];
+    const env_r = parameters.filter(i => i.includes('MAIN_ENV_R'))[0];
+
+    const lp_freq = parameters.filter(i => i.includes('MAIN_LP_FREQ'))[0];
+    const lp_q = parameters.filter(i => i.includes('MAIN_LP_Q'))[0];
+
+    for (let i of [env_a, env_d, env_r]) {
+      this.webAudioNode.setParamValue(i, 0);
+    }
+    this.webAudioNode.setParamValue(env_s, 1);
+
+    this.webAudioNode.setParamValue(lp_freq, 20000);
+    this.webAudioNode.setParamValue(lp_q, 0.1);
   }
 
   generate(type: new (...args: any[]) => BaseNode, ...nodeArgs: any[]): BaseNode {
