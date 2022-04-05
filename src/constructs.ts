@@ -440,14 +440,14 @@ class SynthContext {
     this.userTopology = new AudioOutput([
       new LPFilter(
         new MathsNode('*',
-          this.topology,
           new Envelope(
             new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_A`),
             new Parameter(0.3, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_D`),
             new Parameter(0.8, {min: 0, max: 1, step: 0.01}, `MAIN_ENV_S`),
             new Parameter(0.1, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_R`)
           ),
-          new MIDIGain()
+          new MIDIGain(),
+          this.topology
         ),
         new Parameter(20000, {min: 20, max: 20000, step: 1}, `MAIN_LP_FREQ`),
         new Parameter(0.5, {min: 0.1, max: 30, step: 0.1}, `MAIN_LP_Q`)
@@ -523,7 +523,7 @@ class SynthContext {
     (document.getElementById("code-area") as HTMLDivElement).innerText = this.fullCode;
   }
 
-  measureMFCC() {
+  async measureMFCC() {
     const parameters = this.webAudioNode.getParams();
 
     const env_a = parameters.filter(i => i.includes('MAIN_ENV_A'))[0];
@@ -548,13 +548,16 @@ class SynthContext {
 
     this.webAudioNode.keyOn(0, 69, 127);
 
-    let mfccData = Array(13);
-    setTimeout(() => {
-      mfccData = this.mfccData;
-      console.log(mfccData);
-      this.webAudioNode.keyOff(0, 69, 127);
-      this.analysingNow = false;
-    }, 4096*1000/this.audioContext.sampleRate);
+    // return a Promise that returns the MFCC data upon resolving
+    return new Promise((resolve) => {
+      let mfccData = Array(13);
+      setTimeout(() => {
+        mfccData = this.mfccData;
+        this.webAudioNode.keyOff(0, 69, 127);
+        this.analysingNow = false;
+        resolve(mfccData);
+      }, 4096*1000/this.audioContext.sampleRate);
+    });
   }
 
   generate(type: new (...args: any[]) => BaseNode, ...nodeArgs: any[]): BaseNode {

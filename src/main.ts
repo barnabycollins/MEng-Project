@@ -61,7 +61,7 @@ for (let i = 0; i < contextCount; i++) {
   document.getElementById(`stop-${i}`)?.addEventListener("click", () => stopContext(i));
 }
 
-document.getElementById("resume-btn")?.addEventListener("click", async () => {
+document.getElementById("start-btn")?.addEventListener("click", async () => {
   (document.getElementById("main-panel") as HTMLDivElement).style.display = "flex";
   (document.getElementById("btn-container") as HTMLDivElement).style.display = "none";
 
@@ -81,8 +81,14 @@ document.getElementById("resume-btn")?.addEventListener("click", async () => {
   }
   
   for (let i of contexts) {
-    await i.compile(faust, audioContext);
+    await i.compile(faust);
   }
+
+  setTimeout(async () => {
+    let dave = contexts[0].measureMFCC()
+    console.log(dave);
+    console.log(await dave);
+  }, 1000);
 });
 
 
