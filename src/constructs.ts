@@ -22,6 +22,23 @@ class BaseNode {
 	}
 }
 
+class VGroup extends BaseNode {
+  name: string;
+  input: BaseNode;
+
+  constructor(name: string, input: BaseNode) {
+    super();
+
+    this.name = name;
+    this.input = input;
+  }
+
+  getNodeStrings(): NodeStringsType {
+    const inputStrings = this.input.getNodeStrings();
+    return {definitions: inputStrings.definitions, processCode: `vgroup("${this.name}", ${inputStrings.processCode})`};
+  }
+}
+
 class ValueNode extends BaseNode {
 	constructor() {
 		super();
@@ -96,7 +113,9 @@ class Parameter extends ValueNode {
 	}
 
 	getNodeStrings(): NodeStringsType {
-		return {definitions: [`${this.varName} = hslider("[${this.index}]${this.name} (CC${this.index})[midi:ctrl ${this.index}][scale:${this.scale}]", ${this.defaultValue}, ${this.range.min}, ${this.range.max}, ${this.range.step}) : si.smoo;`], processCode: this.varName};
+    // Faust gets sad if you try and reference CC messages that don't exist
+    const midiString = this.index < 128 ? `[midi:ctrl ${this.index}]` : "";
+		return {definitions: [`${this.varName} = hslider("[${this.index}]${this.name} (CC${this.index})${midiString}[scale:${this.scale}]", ${this.defaultValue}, ${this.range.min}, ${this.range.max}, ${this.range.step}) : si.smoo;`], processCode: this.varName};
 	}
 }
 
@@ -280,7 +299,7 @@ class LPFilter extends SynthNode {
 
 		const processCodes = inputStrings.map(strings => strings.processCode);
 
-		return {definitions: defs, processCode: `(${processCodes[0]} : fi.resonlp(${processCodes[1]}, ${processCodes[2]}, 1))`}
+		return {definitions: defs, processCode: `(${processCodes[0]} : vgroup("Low Pass Filter", fi.resonlp(${processCodes[1]}, ${processCodes[2]}, 1)))`}
 	}
 }
 
@@ -400,7 +419,7 @@ class SynthContext {
   addOutputInterface() {
     this.userTopology = new AudioOutput([
       new LPFilter(
-        new MathsNode('*', 
+        new MathsNode('*',
           this.topology,
           new Envelope(
             new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_A`),
@@ -694,4 +713,4 @@ class SynthContext {
   }
 }
 
-export {MIDIGate, MIDIFreq, MIDIGain, Constant, Parameter, Envelope, MathsNode, Oscillator, FrequencyModulator, LPFilter, AudioOutput, SynthNode, BaseNode, SynthContext};
+export {VGroup, MIDIGate, MIDIFreq, MIDIGain, Constant, Parameter, Envelope, MathsNode, Oscillator, FrequencyModulator, LPFilter, AudioOutput, SynthNode, BaseNode, SynthContext};
