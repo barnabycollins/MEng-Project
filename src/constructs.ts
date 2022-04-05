@@ -337,6 +337,12 @@ class AudioOutput extends SynthNode {
 
 
 
+
+
+
+
+
+
 function sample(array: any[]): any {
   return array[~~(Math.random() * array.length)];
 }
@@ -353,12 +359,19 @@ class SynthContext {
   fullCode: string;
   webAudioNode!: FaustAudioWorkletNode;
 
+  audioContext: AudioContext;
+  gainNode: GainNode;
+
   paramCount: number;
   envCount: number;
   fmCount: number;
   lpFilterCount: number;
 
-  constructor(index: number, topology?: SynthNode) {
+  analysingNow: boolean;
+
+  mfccData: number[];
+
+  constructor(index: number, context: AudioContext, topology?: SynthNode) {
     this.index = index;
     this.uiFrame = document.getElementById(`ui${index}`) as HTMLIFrameElement;
 
@@ -367,6 +380,13 @@ class SynthContext {
     this.fmCount = 0;
     this.lpFilterCount = 0;
     this.fullCode = ""; // populated on compile
+
+    this.audioContext = context;
+    this.gainNode = new GainNode(context, {gain: 1});
+    this.gainNode.connect(context.destination);
+
+    this.analysingNow = false;
+    this.mfccData = new Array(13).fill(0);
 
     const mfccCoefficientCount = 13;
 
@@ -435,18 +455,18 @@ class SynthContext {
     ]);
   }
 
-  async compile(faust: Faust, context: AudioContext) {
+  async compile(faust: Faust) {
     const constructedCode = this.userTopology.getOutputString();
 
     this.fullCode = constructedCode;
 
     // Compile a new Web Audio node from faust code
     let node: FaustAudioWorkletNode;
-    node = await faust.getNode(constructedCode, { audioCtx: context, useWorklet: true, voices: 4, args: { "-I": "libraries/" } }) as FaustAudioWorkletNode;
+    node = await faust.getNode(constructedCode, { audioCtx: this.audioContext, useWorklet: true, voices: 4, args: { "-I": "libraries/" } }) as FaustAudioWorkletNode;
     
     // Connect the node's output to Web Audio
     // @ts-ignore (connect does exist even though TypeScript says it doesn't)
-    node.connect(context.destination);
+    node.connect(this.gainNode);
 
 
     // UI CONTROLS
@@ -470,7 +490,7 @@ class SynthContext {
     });
   
     const meydaAnalyser = Meyda.createMeydaAnalyzer({
-      "audioContext": context,
+      "audioContext": this.audioContext,
       "source": node,
       "bufferSize": 512,
       "featureExtractors": "mfcc",
@@ -481,12 +501,17 @@ class SynthContext {
     
     this.webAudioNode = node;
 
-    this.measureMFCC();
+    if(this.index === 0) setTimeout(() => this.measureMFCC(), 1000);
   }
 
   mfccCallback(values: number[]) {
-    for (let i = 0; i < values.length; i++) {
-      this.mfccBars[i].style.height = `${Math.min(values[i], 100)}px`;
+    if (this.analysingNow) {
+      this.mfccData = values;
+    }
+    else {
+      for (let i = 0; i < values.length; i++) {
+        this.mfccBars[i].style.height = `${Math.min(values[i], 100)}px`;
+      }
     }
   }
 
@@ -516,6 +541,20 @@ class SynthContext {
 
     this.webAudioNode.setParamValue(lp_freq, 20000);
     this.webAudioNode.setParamValue(lp_q, 0.1);
+    
+    this.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+
+    this.analysingNow = true;
+
+    this.webAudioNode.keyOn(0, 69, 127);
+
+    let mfccData = Array(13);
+    setTimeout(() => {
+      mfccData = this.mfccData;
+      console.log(mfccData);
+      this.webAudioNode.keyOff(0, 69, 127);
+      this.analysingNow = false;
+    }, 4096*1000/this.audioContext.sampleRate);
   }
 
   generate(type: new (...args: any[]) => BaseNode, ...nodeArgs: any[]): BaseNode {

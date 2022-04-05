@@ -17,7 +17,6 @@ function log(toLog: any): void {
 let audioContext: AudioContext;
 let faust: Faust;
 
-
 let contexts: c.SynthContext[] = [];
 const contextCount = 4;
 let selectedContext = 0;
@@ -54,9 +53,7 @@ const selectContext = (value?: number) => {
 }
 
 const stopContext = (contextId: number) => {
-  // sends MIDI All Notes Off message (11010000 01111011 00000000)
-  //                                   = 176    = 123    = 0
-  contexts[contextId].webAudioNode.midiMessage([176, 123, 0]);
+  contexts[contextId].webAudioNode.allNotesOff();
 }
 
 for (let i = 0; i < contextCount; i++) {
@@ -80,7 +77,7 @@ document.getElementById("resume-btn")?.addEventListener("click", async () => {
   await faust.ready;
   
   for (let i = 0; i < contextCount; i++) {
-    contexts.push(new c.SynthContext(i));
+    contexts.push(new c.SynthContext(i, audioContext));
   }
   
   for (let i of contexts) {
