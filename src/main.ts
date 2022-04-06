@@ -85,7 +85,7 @@ document.getElementById("start-btn")?.addEventListener("click", async () => {
   }
 
   setTimeout(async () => {
-    let dave = contexts[0].measureMFCC()
+    let dave = contexts[0].measureMFCC();
     console.log(dave);
     console.log(await dave);
   }, 1000);

@@ -371,6 +371,15 @@ class SynthContext {
 
   mfccData: number[];
 
+  params: {
+    env_a: string,
+    env_d: string,
+    env_s: string,
+    env_r: string,
+    lp_freq: string,
+    lp_q: string
+  };
+
   constructor(index: number, context: AudioContext, topology?: SynthNode) {
     this.index = index;
     this.uiFrame = document.getElementById(`ui${index}`) as HTMLIFrameElement;
@@ -405,6 +414,15 @@ class SynthContext {
     }
 
     this.processCode = this.topology.getNodeStrings().processCode;
+
+    this.params = {
+      env_a: "",
+      env_d: "",
+      env_s: "",
+      env_r: "",
+      lp_freq: "",
+      lp_q: ""
+    }
 
     this.addOutputInterface();
   }
@@ -501,7 +519,16 @@ class SynthContext {
     
     this.webAudioNode = node;
 
-    if(this.index === 0) setTimeout(() => this.measureMFCC(), 1000);
+    const parameters = this.webAudioNode.getParams();
+
+    this.params = {
+      env_a: parameters.filter(i => i.includes('MAIN_ENV_A'))[0],
+      env_d: parameters.filter(i => i.includes('MAIN_ENV_D'))[0],
+      env_s: parameters.filter(i => i.includes('MAIN_ENV_S'))[0],
+      env_r: parameters.filter(i => i.includes('MAIN_ENV_R'))[0],
+      lp_freq: parameters.filter(i => i.includes('MAIN_LP_FREQ'))[0],
+      lp_q: parameters.filter(i => i.includes('MAIN_LP_Q'))[0]
+    };
   }
 
   mfccCallback(values: number[]) {
@@ -523,28 +550,35 @@ class SynthContext {
     (document.getElementById("code-area") as HTMLDivElement).innerText = this.fullCode;
   }
 
-  async measureMFCC() {
-    const parameters = this.webAudioNode.getParams();
-
-    const env_a = parameters.filter(i => i.includes('MAIN_ENV_A'))[0];
-    const env_d = parameters.filter(i => i.includes('MAIN_ENV_D'))[0];
-    const env_s = parameters.filter(i => i.includes('MAIN_ENV_S'))[0];
-    const env_r = parameters.filter(i => i.includes('MAIN_ENV_R'))[0];
-
-    const lp_freq = parameters.filter(i => i.includes('MAIN_LP_FREQ'))[0];
-    const lp_q = parameters.filter(i => i.includes('MAIN_LP_Q'))[0];
-
-    for (let i of [env_a, env_d, env_r]) {
+  startAnalysing() {
+    for (let i of [this.params.env_a, this.params.env_d, this.params.env_r]) {
       this.webAudioNode.setParamValue(i, 0);
     }
-    this.webAudioNode.setParamValue(env_s, 1);
+    this.webAudioNode.setParamValue(this.params.env_s, 1);
 
-    this.webAudioNode.setParamValue(lp_freq, 20000);
-    this.webAudioNode.setParamValue(lp_q, 0.1);
+    this.webAudioNode.setParamValue(this.params.lp_freq, 20000);
+    this.webAudioNode.setParamValue(this.params.lp_q, 0.1);
     
     this.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
 
     this.analysingNow = true;
+    console.log("analysing");
+  }
+
+  stopAnalysing() {
+    this.webAudioNode.setParamValue(this.params.env_a, 0.01);
+    this.webAudioNode.setParamValue(this.params.env_d, 0.3);
+    this.webAudioNode.setParamValue(this.params.env_s, 0.8);
+    this.webAudioNode.setParamValue(this.params.env_r, 0.1);
+    
+    this.gainNode.gain.setValueAtTime(1, this.audioContext.currentTime);
+
+    this.analysingNow = false;
+    console.log("done analysing");
+  }
+
+  async measureMFCC() {
+    this.startAnalysing();
 
     this.webAudioNode.keyOn(0, 69, 127);
 
@@ -555,6 +589,7 @@ class SynthContext {
         mfccData = this.mfccData;
         this.webAudioNode.keyOff(0, 69, 127);
         this.analysingNow = false;
+        this.stopAnalysing();
         resolve(mfccData);
       }, 4096*1000/this.audioContext.sampleRate);
     });
