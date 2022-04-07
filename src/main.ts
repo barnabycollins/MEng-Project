@@ -33,14 +33,14 @@ for (let i = 0; i < contextCount; i++) {
   const panelContent = `
     <div class="context-panel" id="panel${i}">
       <iframe id="ui${i}" src="./faust-ui.html" height="700px" width="40%"></iframe>
-      <div class="mfcc-box" id="mfcc${i}">
-        ${mfccBars}
-      </div>
       <div class="control-box">
         <button id="process-code-show-${i}">Show process code</button>
         <button id="full-code-show-${i}">Show full code</button>
         <button id="ctx-select-${i}">Select context</button>
         <button id="stop-${i}">Stop note(s)</button>
+      </div>
+      <div class="mfcc-box" id="mfcc${i}">
+        ${mfccBars}
       </div>
     </div>
   `;
@@ -60,6 +60,10 @@ for (let i = 0; i < contextCount; i++) {
   document.getElementById(`ctx-select-${i}`)?.addEventListener("click", () => selectContext(i));
   document.getElementById(`stop-${i}`)?.addEventListener("click", () => stopContext(i));
 }
+
+document.getElementById("code-close")?.addEventListener("click", () => {
+  (document.getElementById("code-overlay") as HTMLDivElement).style.display = "none";
+});
 
 document.getElementById("start-btn")?.addEventListener("click", async () => {
   (document.getElementById("main-panel") as HTMLDivElement).style.display = "flex";

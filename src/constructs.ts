@@ -462,7 +462,7 @@ class SynthContext {
             new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_A`),
             new Parameter(0.3, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_D`),
             new Parameter(0.8, {min: 0, max: 1, step: 0.01}, `MAIN_ENV_S`),
-            new Parameter(0.1, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_R`)
+            new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_R`)
           ),
           new MIDIGain(),
           this.topology
@@ -543,11 +543,13 @@ class SynthContext {
   }
 
   showProcessCode() {
-    (document.getElementById("code-area") as HTMLDivElement).innerText = this.processCode;
+    (document.getElementById("code-box") as HTMLDivElement).innerText = this.processCode;
+    (document.getElementById("code-overlay") as HTMLDivElement).style.display = "flex";
   }
 
   showFullCode() {
-    (document.getElementById("code-area") as HTMLDivElement).innerText = this.fullCode;
+    (document.getElementById("code-box") as HTMLDivElement).innerText = this.fullCode;
+    (document.getElementById("code-overlay") as HTMLDivElement).style.display = "flex";
   }
 
   startAnalysing() {
@@ -565,18 +567,19 @@ class SynthContext {
   }
 
   stopAnalysing(): Promise<void> {
+    // allow 20ms so that the envelope's re-enabled release doesn't let any sound through
     return new Promise((resolve) => {
       setTimeout(() => {
         this.webAudioNode.setParamValue(this.params.env_a, 0.01);
         this.webAudioNode.setParamValue(this.params.env_d, 0.3);
         this.webAudioNode.setParamValue(this.params.env_s, 0.8);
-        this.webAudioNode.setParamValue(this.params.env_r, 0.1);
+        this.webAudioNode.setParamValue(this.params.env_r, 0.01);
         this.gainNode.gain.setValueAtTime(1, this.audioContext.currentTime);
   
         this.analysingNow = false;
         
         resolve();
-      }, 100);
+      }, 20);
     })
   }
 

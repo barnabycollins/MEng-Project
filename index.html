@@ -8,15 +8,16 @@
     <title>Vite App</title>
   </head>
   <body>
-    <h1>Synth Playground</h1>
     <div id="btn-container">
       <button id="start-btn">Start</button>
     </div>
     <div id="main-panel">
       <!-- populated by JS -->
     </div>
-    <br>
-    <div id="code-area"></div>
+    <div id="code-overlay">
+      <div id="code-box"></div>
+      <div id="code-close">X</div>
+    </div>
     <script type="module" src="/src/constructs.ts"></script>
     <script type="module" src="/src/main.ts"></script>
   </body>
