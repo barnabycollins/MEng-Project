@@ -562,34 +562,49 @@ class SynthContext {
     this.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
 
     this.analysingNow = true;
-    console.log("analysing");
   }
 
-  stopAnalysing() {
-    this.webAudioNode.setParamValue(this.params.env_a, 0.01);
-    this.webAudioNode.setParamValue(this.params.env_d, 0.3);
-    this.webAudioNode.setParamValue(this.params.env_s, 0.8);
-    this.webAudioNode.setParamValue(this.params.env_r, 0.1);
-    
-    this.gainNode.gain.setValueAtTime(1, this.audioContext.currentTime);
-
-    this.analysingNow = false;
-    console.log("done analysing");
+  stopAnalysing(): Promise<void> {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        this.webAudioNode.setParamValue(this.params.env_a, 0.01);
+        this.webAudioNode.setParamValue(this.params.env_d, 0.3);
+        this.webAudioNode.setParamValue(this.params.env_s, 0.8);
+        this.webAudioNode.setParamValue(this.params.env_r, 0.1);
+        this.gainNode.gain.setValueAtTime(1, this.audioContext.currentTime);
+  
+        this.analysingNow = false;
+        
+        resolve();
+      }, 100);
+    })
   }
 
-  async measureMFCC() {
+  async measureMFCC(): Promise<number[][]> {
     this.startAnalysing();
+    return new Promise(async (resolve) => {
 
-    this.webAudioNode.keyOn(0, 69, 127);
+      let results: number[][] = [];
+      results.push(await this.measureNote(36));   // C2
+      results.push(await this.measureNote(69));   // A4
+      results.push(await this.measureNote(101));  // F7
+
+      await this.stopAnalysing();
+      
+      resolve(results);
+    });
+  }
+
+  async measureNote(midiNote: number): Promise<number[]> {
+
+    this.webAudioNode.keyOn(0, midiNote, 127);
 
     // return a Promise that returns the MFCC data upon resolving
     return new Promise((resolve) => {
       let mfccData = Array(13);
       setTimeout(() => {
         mfccData = this.mfccData;
-        this.webAudioNode.keyOff(0, 69, 127);
-        this.analysingNow = false;
-        this.stopAnalysing();
+        this.webAudioNode.keyOff(0, midiNote, 127);
         resolve(mfccData);
       }, 4096*1000/this.audioContext.sampleRate);
     });
