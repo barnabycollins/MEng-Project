@@ -34,7 +34,7 @@ for (let i = 0; i < contextCount; i++) {
 
   const panelContent = `
     <div class="context-panel" id="panel${i}">
-      <iframe id="ui${i}" src="./faust-ui.html" height="700px" width="40%"></iframe>
+      <iframe id="ui${i}" src="./faust-ui.html" height="100px" width="50px"></iframe>
       <div class="control-box">
         <button id="process-code-show-${i}">Show process code</button>
         <button id="full-code-show-${i}">Show full code</button>
@@ -50,7 +50,7 @@ for (let i = 0; i < contextCount; i++) {
   panel.innerHTML += panelContent;
 }
 
-const selectContext = (value?: number) => {
+function selectContext(value?: number) {
   if (value === undefined) value = (selectedContext + 1) % contextCount;
   selectedContext = value;
   for (let i = 0; i < contextCount; i++) {
@@ -63,16 +63,18 @@ const selectContext = (value?: number) => {
   }
 }
 
-const stopContext = (contextId: number) => {
+function stopContext(contextId: number) {
   contexts[contextId].webAudioNode.allNotesOff();
 }
 
-const selectFavourite = (contextId: number) => {
+function selectFavourite(contextId: number) {
   if (contextId === favouriteContext) {
     favouriteContext = -1;
+    (document.getElementById("evolve-btn") as HTMLButtonElement).classList.add("inactive");
   }
   else {
     favouriteContext = contextId;
+    (document.getElementById("evolve-btn") as HTMLButtonElement).classList.remove("inactive");
   }
   for (let i = 0; i < contextCount; i++) {
     if (i === favouriteContext) {
@@ -84,10 +86,10 @@ const selectFavourite = (contextId: number) => {
   }
 }
 
-const closeCode = () => {
+function closeCode() {
   (document.getElementById("code-overlay") as HTMLDivElement).style.display = "none";
-};
-const showProcessCode = (i: number) => {
+}
+function showProcessCode(i: number) {
   const shownCode = `process${i}`;
   if (shownCode === currentShownCode) {
     currentShownCode = "";
@@ -99,7 +101,7 @@ const showProcessCode = (i: number) => {
     (document.getElementById("code-overlay") as HTMLDivElement).style.display = "flex";
   }
 }
-const showFullCode = (i: number) => {
+function showFullCode(i: number) {
   const shownCode = `full${i}`;
   if (shownCode === currentShownCode) {
     currentShownCode = "";
@@ -112,13 +114,13 @@ const showFullCode = (i: number) => {
   }
 }
 
-const start = async () => {
+async function start() {
   (document.getElementById("main-panel") as HTMLDivElement).style.display = "flex";
   (document.getElementById("btn-container") as HTMLDivElement).style.display = "none";
 
   // Connect to Web Audio
   audioContext = new window.AudioContext();
-  
+
   // Enable Faust compiler; wait until it's ready
   faust = new Faust({
     debug: LOG,
@@ -126,20 +128,14 @@ const start = async () => {
     dataLocation: "src/libfaust/libfaust-wasm.data"
   });
   await faust.ready;
-  
+
   for (let i = 0; i < contextCount; i++) {
     contexts.push(new c.SynthContext(i, audioContext));
   }
-  
+
   for (let i of contexts) {
     await i.compile(faust);
   }
-
-  setTimeout(async () => {
-    let dave = contexts[0].measureMFCC();
-    console.log(dave);
-    console.log(await dave);
-  }, 1000);
 }
 
 for (let i = 0; i < contextCount; i++) {
