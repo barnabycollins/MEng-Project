@@ -1,6 +1,7 @@
 import {Faust} from "faust2webaudio";
 import {WebMidi, Input, MessageEvent} from "webmidi";
 import * as c from "./constructs";
+import {fitness} from "./genetic";
 
 // LOGGING
 const LOG = false;
@@ -35,6 +36,7 @@ for (let i = 0; i < contextCount; i++) {
   const panelContent = `
     <div class="context-panel" id="panel${i}">
       <iframe id="ui${i}" src="./faust-ui.html" height="100px" width="50px"></iframe>
+      <div class="indicators"></div>
       <div class="control-box">
         <button id="process-code-show-${i}">Show process code</button>
         <button id="full-code-show-${i}">Show full code</button>
@@ -114,6 +116,16 @@ function showFullCode(i: number) {
   }
 }
 
+async function evolve() {
+  if (favouriteContext === -1) {
+    return;
+  }
+
+  const target = await contexts[favouriteContext].measureMFCC();
+
+  console.log(target);
+}
+
 async function start() {
   (document.getElementById("main-panel") as HTMLDivElement).style.display = "flex";
   (document.getElementById("btn-container") as HTMLDivElement).style.display = "none";
@@ -149,6 +161,8 @@ for (let i = 0; i < contextCount; i++) {
 document.getElementById("code-close")?.addEventListener("click", () => closeCode());
 
 document.getElementById("start-btn")?.addEventListener("click", async () => await start());
+
+document.getElementById("evolve-btn")?.addEventListener("click", () => evolve());
 
 
 // MIDI SETUP
