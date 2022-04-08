@@ -23,7 +23,7 @@ let selectedContext = 0;
 let favouriteContext = -1;
 let currentShownCode = "";
 
-const panel = document.getElementById("main-panel") as HTMLDivElement;
+const panel = document.getElementById("synth-row") as HTMLDivElement;
 for (let i = 0; i < contextCount; i++) {
   const mfccCoefficientCount = 13; // taken from Meyda.js MFCC
   let mfccBars = "";
