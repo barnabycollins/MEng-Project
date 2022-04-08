@@ -3,6 +3,17 @@ body {
   min-height: 100%;
   font-family: sans-serif;
 
+  background-color: #eeeeee;
+
+  button {
+    padding: 1% 2%;
+    cursor: pointer;
+
+    background-color: #ffffff;
+    color: #000000;
+    border: 1px solid #555555;
+  }
+
   h1 {
     padding: 1vh 3vw;
   }
@@ -19,6 +30,8 @@ body {
     max-width: 50%;
 
     align-items: flex-start;
+
+    box-shadow: 0px 0px 30px -5px #000000;
 
     #code-box {
       font-family: monospace;
@@ -60,6 +73,28 @@ body {
 
       margin: 5px 0px 5px 5px;
 
+      &.favourite {
+        .control-box {
+          border-top-color: #2f502f;
+          .favourite-select {
+            background-color: #555555;
+            color: #ffffff;
+          }
+        }
+      }
+
+      &.midi-enabled {
+        iframe {
+          border-bottom-color: #ff9100;
+        }
+        .control-box {
+          .ctx-select {
+            background-color: #555555;
+            color: #ffffff;
+          }
+        }
+      }
+
       &:last-child {
         margin-right: 5px;
       }
@@ -69,6 +104,23 @@ body {
         border: 0;
         margin-bottom: 2px;
         flex-grow: 1;
+        padding-bottom: 2px;
+        border-bottom: 5px solid #00000000;
+        transition: border-bottom-color 0.3s;
+      }
+
+      .control-box {
+        border-top: 5px solid #00000000;
+        transition: border-top-color 0.3s;
+        
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+
+        button {
+          margin: 3px;
+          transition: color 0.3s, background-color 0.3s;
+        }
       }
 
       .mfcc-box {

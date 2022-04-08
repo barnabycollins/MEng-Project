@@ -403,8 +403,6 @@ class SynthContext {
     for (let i = 0; i < mfccCoefficientCount; i++) {
       this.mfccBars.push(document.getElementById(`bar-${index}-${i}`) as HTMLDivElement);
     }
-    document.getElementById(`process-code-show-${index}`)?.addEventListener("click", this.showProcessCode.bind(this));
-    document.getElementById(`full-code-show-${index}`)?.addEventListener("click", this.showFullCode.bind(this));
 
     if (topology !== undefined) {
       this.topology = topology;
@@ -540,16 +538,6 @@ class SynthContext {
         this.mfccBars[i].style.height = `${Math.min(values[i], 100)}px`;
       }
     }
-  }
-
-  showProcessCode() {
-    (document.getElementById("code-box") as HTMLDivElement).innerText = this.processCode;
-    (document.getElementById("code-overlay") as HTMLDivElement).style.display = "flex";
-  }
-
-  showFullCode() {
-    (document.getElementById("code-box") as HTMLDivElement).innerText = this.fullCode;
-    (document.getElementById("code-overlay") as HTMLDivElement).style.display = "flex";
   }
 
   startAnalysing() {
