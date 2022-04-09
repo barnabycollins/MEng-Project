@@ -380,7 +380,9 @@ class SynthContext {
     lp_q: string
   };
 
-  constructor(index: number, context: AudioContext, topology?: SynthNode) {
+  headless: boolean;
+
+  constructor(index: number, context: AudioContext, topology?: SynthNode, headless: boolean = false) {
     this.index = index;
     this.uiFrame = document.getElementById(`ui${index}`) as HTMLIFrameElement;
 
@@ -394,10 +396,12 @@ class SynthContext {
     this.gainNode = new GainNode(context, {gain: 1});
     this.gainNode.connect(context.destination);
 
-    this.analysingNow = false;
+    this.analysingNow = headless;
     this.mfccData = new Array(13).fill(0);
 
     const mfccCoefficientCount = 13;
+
+    this.headless = headless;
 
     this.mfccBars = [];
     for (let i = 0; i < mfccCoefficientCount; i++) {
@@ -438,7 +442,7 @@ class SynthContext {
     const rootNodeType = sample(possibleNodes);
     let rootNode = this.generate(rootNodeType);
   
-    while (!rootNode.carriesSound || rootNode.graphSize > 50) {
+    while (!rootNode.carriesSound || rootNode.graphSize > 30) {
       this.resetCounts();
       rootNode = this.generate(rootNodeType);
     }
@@ -453,25 +457,32 @@ class SynthContext {
   }
 
   addOutputInterface() {
-    this.userTopology = new AudioOutput([
-      new LPFilter(
-        new MathsNode('*',
-          new Envelope(
-            new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_A`),
-            new Parameter(0.3, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_D`),
-            new Parameter(0.8, {min: 0, max: 1, step: 0.01}, `MAIN_ENV_S`),
-            new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_R`)
+    if (this.headless) {
+      this.userTopology = new AudioOutput([this.topology]);
+      this.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+    }
+    else {
+      this.userTopology = new AudioOutput([
+        new LPFilter(
+          new MathsNode('*',
+            new Envelope(
+              new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_A`),
+              new Parameter(0.3, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_D`),
+              new Parameter(0.8, {min: 0, max: 1, step: 0.01}, `MAIN_ENV_S`),
+              new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_R`)
+            ),
+            new MIDIGain(),
+            this.topology
           ),
-          new MIDIGain(),
-          this.topology
-        ),
-        new Parameter(20000, {min: 20, max: 20000, step: 1}, `MAIN_LP_FREQ`),
-        new Parameter(0.5, {min: 0.1, max: 30, step: 0.1}, `MAIN_LP_Q`)
-      )
-    ]);
+          new Parameter(20000, {min: 20, max: 20000, step: 1}, `MAIN_LP_FREQ`),
+          new Parameter(0.5, {min: 0.1, max: 30, step: 0.1}, `MAIN_LP_Q`)
+        )
+      ]);
+    }
   }
 
   async compile(faust: Faust) {
+    console.log(`Context ${this.index} beginning compilation.`);
     const constructedCode = this.userTopology.getOutputString();
 
     this.fullCode = constructedCode;
@@ -483,27 +494,41 @@ class SynthContext {
     // Connect the node's output to Web Audio
     // @ts-ignore (connect does exist even though TypeScript says it doesn't)
     node.connect(this.gainNode);
-
-
-    // UI CONTROLS
     
-    // Find UI iframe
-    const uiWindow = this.uiFrame.contentWindow as Window;
-    
-    // Make the UI update when parameters change on the backend (eg, when a control is modulated by MIDI)
-    node.setOutputParamHandler((path: string, value: number) => {
-      const msg = {path, value, type: "param"};
+    this.webAudioNode = node;
+
+    if (!this.headless) {
+      // UI CONTROLS
+      
+      // Find UI iframe
+      const uiWindow = this.uiFrame.contentWindow as Window;
+      
+      // Make the UI update when parameters change on the backend (eg, when a control is modulated by MIDI)
+      node.setOutputParamHandler((path: string, value: number) => {
+        const msg = {path, value, type: "param"};
+        uiWindow.postMessage(msg, "*");
+      });
+      
+      // Send node parameters to the UI for display
+      const msg = {type: "ui", ui: node.getUI()};
       uiWindow.postMessage(msg, "*");
-    });
-    
-    // Send node parameters to the UI for display
-    const msg = {type: "ui", ui: node.getUI()};
-    uiWindow.postMessage(msg, "*");
-    
-    // Add a listener for when we receive control changes from the iframe
-    window.addEventListener("message", (e) => {
-      node.setParamValue(e.data.path, e.data.value);
-    });
+      
+      // Add a listener for when we receive control changes from the iframe
+      window.addEventListener("message", (e) => {
+        node.setParamValue(e.data.path, e.data.value);
+      });
+
+      const parameters = node.getParams();
+  
+      this.params = {
+        env_a: parameters.filter(i => i.includes('MAIN_ENV_A'))[0],
+        env_d: parameters.filter(i => i.includes('MAIN_ENV_D'))[0],
+        env_s: parameters.filter(i => i.includes('MAIN_ENV_S'))[0],
+        env_r: parameters.filter(i => i.includes('MAIN_ENV_R'))[0],
+        lp_freq: parameters.filter(i => i.includes('MAIN_LP_FREQ'))[0],
+        lp_q: parameters.filter(i => i.includes('MAIN_LP_Q'))[0]
+      };
+    }
   
     const meydaAnalyser = Meyda.createMeydaAnalyzer({
       "audioContext": this.audioContext,
@@ -514,19 +539,7 @@ class SynthContext {
     });
     
     meydaAnalyser.start();
-    
-    this.webAudioNode = node;
-
-    const parameters = this.webAudioNode.getParams();
-
-    this.params = {
-      env_a: parameters.filter(i => i.includes('MAIN_ENV_A'))[0],
-      env_d: parameters.filter(i => i.includes('MAIN_ENV_D'))[0],
-      env_s: parameters.filter(i => i.includes('MAIN_ENV_S'))[0],
-      env_r: parameters.filter(i => i.includes('MAIN_ENV_R'))[0],
-      lp_freq: parameters.filter(i => i.includes('MAIN_LP_FREQ'))[0],
-      lp_q: parameters.filter(i => i.includes('MAIN_LP_Q'))[0]
-    };
+    console.log(`Context ${this.index} compiled.`);
   }
 
   mfccCallback(values: number[]) {
@@ -572,7 +585,9 @@ class SynthContext {
   }
 
   async measureMFCC(): Promise<number[][]> {
-    this.startAnalysing();
+    if (!this.headless) {
+      this.startAnalysing();
+    }
     return new Promise(async (resolve) => {
 
       let results: number[][] = [];
@@ -580,7 +595,9 @@ class SynthContext {
       results.push(await this.measureNote(69));   // A4
       results.push(await this.measureNote(101));  // F7
 
-      await this.stopAnalysing();
+      if (!this.headless) {
+        await this.stopAnalysing();
+      }
       
       resolve(results);
     });

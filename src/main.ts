@@ -116,6 +116,10 @@ function showFullCode(i: number) {
   }
 }
 
+function startEvolving() {
+  // do stuff
+}
+
 async function evolve() {
   if (favouriteContext === -1) {
     return;
@@ -123,7 +127,24 @@ async function evolve() {
 
   const target = await contexts[favouriteContext].measureMFCC();
 
-  console.log(target);
+  startEvolving();
+
+  const POPULATION_SIZE = 4;
+
+  let evolvingContexts: c.SynthContext[] = [];
+  for (let i = 0; i < POPULATION_SIZE; i++) {
+    evolvingContexts.push(new c.SynthContext(i, audioContext, undefined, true));
+  }
+
+  let measurements: number[][][];
+
+  const NUM_ROUNDS = 1000;
+  for (let i = 0; i < NUM_ROUNDS; i++) {
+    console.log("starting");
+    await Promise.all(evolvingContexts.map(context => context.compile(faust)));
+    measurements = await Promise.all(evolvingContexts.map(context => context.measureMFCC()));
+    console.log(measurements);
+  }
 }
 
 async function start() {
@@ -145,9 +166,7 @@ async function start() {
     contexts.push(new c.SynthContext(i, audioContext));
   }
 
-  for (let i of contexts) {
-    await i.compile(faust);
-  }
+  await Promise.all(contexts.map(context => context.compile(faust)));
 }
 
 for (let i = 0; i < contextCount; i++) {
