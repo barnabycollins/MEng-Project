@@ -23,6 +23,7 @@ const contextCount = 4;
 let selectedContext = 0;
 let favouriteContext = -1;
 let currentShownCode = "";
+let evolving = false;
 
 const panel = document.getElementById("synth-row") as HTMLDivElement;
 for (let i = 0; i < contextCount; i++) {
@@ -66,7 +67,7 @@ function selectContext(value?: number) {
 }
 
 function stopContext(contextId: number) {
-  contexts[contextId].webAudioNode.allNotesOff();
+  contexts[contextId].allNotesOff();
 }
 
 function selectFavourite(contextId: number) {
@@ -117,19 +118,17 @@ function showFullCode(i: number) {
 }
 
 function startEvolving() {
-  // do stuff
+  evolving = true;
 }
 
 async function evolve() {
-  if (favouriteContext === -1) {
-    return;
-  }
-
-  const target = await contexts[favouriteContext].measureMFCC();
+  if (evolving || favouriteContext === -1) return;
 
   startEvolving();
 
-  const POPULATION_SIZE = 4;
+  const target = await contexts[favouriteContext].measureMFCC();
+
+  const POPULATION_SIZE = 2;
 
   let evolvingContexts: c.SynthContext[] = [];
   for (let i = 0; i < POPULATION_SIZE; i++) {
@@ -140,10 +139,12 @@ async function evolve() {
 
   const NUM_ROUNDS = 1000;
   for (let i = 0; i < NUM_ROUNDS; i++) {
-    console.log("starting");
+    console.log(`Starting round ${i}`);
+    evolvingContexts.forEach(context => context.mutateSynth());
     await Promise.all(evolvingContexts.map(context => context.compile(faust)));
     measurements = await Promise.all(evolvingContexts.map(context => context.measureMFCC()));
     console.log(measurements);
+    evolvingContexts.forEach(context => context.cleanUp());
   }
 }
 
@@ -196,7 +197,7 @@ else {
 
   WebMidi.inputs.forEach((device: Input) => {
     device.addListener("midimessage", (e: MessageEvent) => {
-      contexts[selectedContext].webAudioNode.midiMessage(e.message.data);
+      contexts[selectedContext].midiMessage(e.message.data);
 
       log(`Received ${e.message.type} from ${device.name}`);
     });

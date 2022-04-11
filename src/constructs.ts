@@ -1,5 +1,6 @@
 import { Faust, FaustAudioWorkletNode } from "faust2webaudio";
 import Meyda from "meyda";
+import { MeydaAnalyzer } from "meyda/dist/esm/meyda-wa";
 
 type WaveformType = 'sine' | 'saw' | 'square' | 'triangle';
 
@@ -357,9 +358,11 @@ class SynthContext {
   processCode: string;
   userTopology!: AudioOutput;
   fullCode: string;
-  webAudioNode!: FaustAudioWorkletNode;
+  webAudioNode: FaustAudioWorkletNode | undefined;
+  analyser: MeydaAnalyzer | undefined;
 
   audioContext: AudioContext;
+  passthrough: GainNode;
   gainNode: GainNode;
 
   paramCount: number;
@@ -395,6 +398,18 @@ class SynthContext {
     this.audioContext = context;
     this.gainNode = new GainNode(context, {gain: 1});
     this.gainNode.connect(context.destination);
+    this.passthrough = new GainNode(context, {gain: 1});
+    this.passthrough.connect(this.gainNode);
+  
+    this.analyser = Meyda.createMeydaAnalyzer({
+      "audioContext": this.audioContext,
+      "source": this.passthrough,
+      "bufferSize": 512,
+      "featureExtractors": "mfcc",
+      "callback": this.mfccCallback.bind(this)
+    });
+    
+    this.analyser.start();
 
     this.analysingNow = headless;
     this.mfccData = new Array(13).fill(0);
@@ -493,7 +508,7 @@ class SynthContext {
     
     // Connect the node's output to Web Audio
     // @ts-ignore (connect does exist even though TypeScript says it doesn't)
-    node.connect(this.gainNode);
+    node.connect(this.passthrough);
     
     this.webAudioNode = node;
 
@@ -529,16 +544,6 @@ class SynthContext {
         lp_q: parameters.filter(i => i.includes('MAIN_LP_Q'))[0]
       };
     }
-  
-    const meydaAnalyser = Meyda.createMeydaAnalyzer({
-      "audioContext": this.audioContext,
-      "source": node,
-      "bufferSize": 512,
-      "featureExtractors": "mfcc",
-      "callback": this.mfccCallback.bind(this)
-    });
-    
-    meydaAnalyser.start();
     console.log(`Context ${this.index} compiled.`);
   }
 
@@ -553,28 +558,40 @@ class SynthContext {
     }
   }
 
-  startAnalysing() {
-    for (let i of [this.params.env_a, this.params.env_d, this.params.env_r]) {
-      this.webAudioNode.setParamValue(i, 0);
-    }
-    this.webAudioNode.setParamValue(this.params.env_s, 1);
+  checkNodeExists(value: FaustAudioWorkletNode | undefined): asserts value is FaustAudioWorkletNode {
+    if (value === undefined) throw new Error("Cannot analyse an uncompiled node!");
+  }
 
-    this.webAudioNode.setParamValue(this.params.lp_freq, 20000);
-    this.webAudioNode.setParamValue(this.params.lp_q, 0.1);
+  allNotesOff() {
+    this.webAudioNode?.allNotesOff();
+  }
+  midiMessage(data: number[] | Uint8Array) {
+    this.webAudioNode?.midiMessage(data);
+  }
+
+  startAnalysing(node: FaustAudioWorkletNode) {
+
+    for (let i of [this.params.env_a, this.params.env_d, this.params.env_r]) {
+      node.setParamValue(i, 0);
+    }
+    node.setParamValue(this.params.env_s, 1);
+
+    node.setParamValue(this.params.lp_freq, 20000);
+    node.setParamValue(this.params.lp_q, 0.1);
     
     this.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
 
     this.analysingNow = true;
   }
 
-  stopAnalysing(): Promise<void> {
+  stopAnalysing(node: FaustAudioWorkletNode): Promise<void> {
     // allow 20ms so that the envelope's re-enabled release doesn't let any sound through
     return new Promise((resolve) => {
       setTimeout(() => {
-        this.webAudioNode.setParamValue(this.params.env_a, 0.01);
-        this.webAudioNode.setParamValue(this.params.env_d, 0.3);
-        this.webAudioNode.setParamValue(this.params.env_s, 0.8);
-        this.webAudioNode.setParamValue(this.params.env_r, 0.01);
+        node.setParamValue(this.params.env_a, 0.01);
+        node.setParamValue(this.params.env_d, 0.3);
+        node.setParamValue(this.params.env_s, 0.8);
+        node.setParamValue(this.params.env_r, 0.01);
         this.gainNode.gain.setValueAtTime(1, this.audioContext.currentTime);
   
         this.analysingNow = false;
@@ -585,37 +602,51 @@ class SynthContext {
   }
 
   async measureMFCC(): Promise<number[][]> {
+    this.checkNodeExists(this.webAudioNode);
+    
     if (!this.headless) {
-      this.startAnalysing();
+      this.startAnalysing(this.webAudioNode);
     }
     return new Promise(async (resolve) => {
+      this.checkNodeExists(this.webAudioNode);
 
       let results: number[][] = [];
-      results.push(await this.measureNote(36));   // C2
-      results.push(await this.measureNote(69));   // A4
-      results.push(await this.measureNote(101));  // F7
+      results.push(await this.measureNote(36, this.webAudioNode));   // C2
+      results.push(await this.measureNote(69, this.webAudioNode));   // A4
+      results.push(await this.measureNote(101, this.webAudioNode));  // F7
 
       if (!this.headless) {
-        await this.stopAnalysing();
+        await this.stopAnalysing(this.webAudioNode);
       }
       
       resolve(results);
     });
   }
 
-  async measureNote(midiNote: number): Promise<number[]> {
+  async measureNote(midiNote: number, node: FaustAudioWorkletNode): Promise<number[]> {
 
-    this.webAudioNode.keyOn(0, midiNote, 127);
+    node.keyOn(0, midiNote, 127);
 
     // return a Promise that returns the MFCC data upon resolving
     return new Promise((resolve) => {
       let mfccData = Array(13);
       setTimeout(() => {
         mfccData = this.mfccData;
-        this.webAudioNode.keyOff(0, midiNote, 127);
+        node.keyOff(0, midiNote, 127);
         resolve(mfccData);
       }, 4096*1000/this.audioContext.sampleRate);
     });
+  }
+
+  cleanUp() {
+    console.log(`Cleaning up context ${this.index}`)
+    this.fullCode = "";
+    
+    // @ts-ignore (disconnect does exist even though TypeScript says it doesn't)
+    this.webAudioNode?.disconnect(this.passthrough);
+    this.webAudioNode = undefined;
+
+    // Node will now be garbage collected (in theory)!
   }
 
   generate(type: new (...args: any[]) => BaseNode, ...nodeArgs: any[]): BaseNode {
@@ -785,9 +816,9 @@ class SynthContext {
         }
       }
       else if (randomValue < MUTATE_CHANCE) {
-        return this.generate(MathsNode, undefined, ...node.inputs.map(this.mutate));
+        return this.generate(MathsNode, undefined, ...node.inputs.map(this.mutate.bind(this)));
       }
-      return this.generate(MathsNode, node.operation, ...node.inputs.map(this.mutate));
+      return this.generate(MathsNode, node.operation, ...node.inputs.map(this.mutate.bind(this)));
     }
     else if (node instanceof Oscillator) {
       const randomValue = Math.random();
