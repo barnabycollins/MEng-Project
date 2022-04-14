@@ -395,11 +395,24 @@ class SynthContext {
     this.lpFilterCount = 0;
     this.fullCode = ""; // populated on compile
 
+    this.mfccBars = [];
+
     this.audioContext = context;
     this.gainNode = new GainNode(context, {gain: 1});
     this.gainNode.connect(context.destination);
     this.passthrough = new GainNode(context, {gain: 1});
     this.passthrough.connect(this.gainNode);
+
+    this.headless = headless;
+    if (this.headless) {
+      this.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+    }
+    else {
+      const mfccCoefficientCount = 13;
+      for (let i = 0; i < mfccCoefficientCount; i++) {
+        this.mfccBars.push(document.getElementById(`bar-${index}-${i}`) as HTMLDivElement);
+      }
+    }
   
     this.analyser = Meyda.createMeydaAnalyzer({
       "audioContext": this.audioContext,
@@ -413,15 +426,6 @@ class SynthContext {
 
     this.analysingNow = headless;
     this.mfccData = new Array(13).fill(0);
-
-    const mfccCoefficientCount = 13;
-
-    this.headless = headless;
-
-    this.mfccBars = [];
-    for (let i = 0; i < mfccCoefficientCount; i++) {
-      this.mfccBars.push(document.getElementById(`bar-${index}-${i}`) as HTMLDivElement);
-    }
 
     if (topology !== undefined) {
       this.topology = topology;
@@ -441,6 +445,12 @@ class SynthContext {
       lp_q: ""
     }
 
+    this.addOutputInterface();
+  }
+
+  setTopology(topology: SynthNode) {
+    this.topology = topology;
+    this.processCode = this.topology.getNodeStrings().processCode;
     this.addOutputInterface();
   }
 
@@ -474,7 +484,6 @@ class SynthContext {
   addOutputInterface() {
     if (this.headless) {
       this.userTopology = new AudioOutput([this.topology]);
-      this.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
     }
     else {
       this.userTopology = new AudioOutput([
@@ -644,7 +653,8 @@ class SynthContext {
     
     // @ts-ignore (disconnect does exist even though TypeScript says it doesn't)
     this.webAudioNode?.disconnect(this.passthrough);
-    this.webAudioNode = undefined;
+    this.webAudioNode?.destroy();
+    delete this.webAudioNode;
 
     // Node will now be garbage collected (in theory)!
   }
@@ -791,7 +801,7 @@ class SynthContext {
       else if (randomValue < MUTATE_CHANCE) {
         return this.generate(Parameter);
       }
-      return this.generate(Parameter, node.defaultValue);
+      return this.generate(Parameter, node.defaultValue, node.range);
     }
     else if (node instanceof MIDIFreq) {
       const randomValue = Math.random();

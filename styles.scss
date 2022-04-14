@@ -66,6 +66,18 @@ body {
     width: 100%;
     height: 100vh;
 
+    #progress-area {
+      width: 100%;
+      height: 5px;
+  
+      #progress-bar {
+        width: 100%;
+        height: 100%;
+        background-color: #555555;
+        transition: width 0.3s ease;
+      }
+    }
+
     #top-row {
       display: flex;
       flex-direction: row;

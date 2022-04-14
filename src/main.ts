@@ -25,6 +25,18 @@ let favouriteContext = -1;
 let currentShownCode = "";
 let evolving = false;
 
+type BestType = {
+  topology: c.SynthNode | undefined,
+  score: number
+};
+
+let best: BestType = {
+  topology: undefined,
+  score: 0
+};
+
+let bests: BestType[] = [];
+
 const panel = document.getElementById("synth-row") as HTMLDivElement;
 for (let i = 0; i < contextCount; i++) {
   const mfccCoefficientCount = 13; // taken from Meyda.js MFCC
@@ -121,14 +133,27 @@ function startEvolving() {
   evolving = true;
 }
 
+function test(context: c.SynthContext): Promise<number[][]> {
+  return new Promise<number[][]>(async (resolve) => {
+    context.mutateSynth();
+    await context.compile(faust);
+    const measurement = await context.measureMFCC();
+    context.cleanUp();
+    resolve(measurement);
+  });
+}
+
+
+const POPULATION_SIZE = 4;
+const NUM_ROUNDS = 50;
+const progressBar = document.getElementById("progress-bar") as HTMLDivElement;
 async function evolve() {
+  progressBar.style.width = "0px";
   if (evolving || favouriteContext === -1) return;
 
   startEvolving();
 
   const target = await contexts[favouriteContext].measureMFCC();
-
-  const POPULATION_SIZE = 2;
 
   let evolvingContexts: c.SynthContext[] = [];
   for (let i = 0; i < POPULATION_SIZE; i++) {
@@ -136,16 +161,47 @@ async function evolve() {
   }
 
   let measurements: number[][][];
+  let roundBest: BestType = {
+    topology: undefined,
+    score: 0
+  };
 
-  const NUM_ROUNDS = 1000;
   for (let i = 0; i < NUM_ROUNDS; i++) {
+    progressBar.style.width = `${(i/NUM_ROUNDS)*100}%`;
+
     console.log(`Starting round ${i}`);
-    evolvingContexts.forEach(context => context.mutateSynth());
-    await Promise.all(evolvingContexts.map(context => context.compile(faust)));
-    measurements = await Promise.all(evolvingContexts.map(context => context.measureMFCC()));
-    console.log(measurements);
-    evolvingContexts.forEach(context => context.cleanUp());
+    measurements = await Promise.all(evolvingContexts.map(context => test(context)));
+    
+    roundBest = {
+      topology: undefined,
+      score: 0
+    };
+
+    for (let j = 0; j < POPULATION_SIZE; j++) {
+      const measurement = measurements[j];
+      const currentFitness = fitness(target, measurement);
+
+      if (currentFitness > roundBest.score) {
+        roundBest = {
+          topology: evolvingContexts[j].topology,
+          score: currentFitness
+        };
+
+        if (currentFitness > best.score) {
+          best = {
+            topology: evolvingContexts[j].topology,
+            score: currentFitness
+          };
+
+          bests = [best, ...bests];
+          console.log(`NEW BEST: ${currentFitness}`);
+        }
+      }
+    }
+    evolvingContexts.forEach(context => context.setTopology((roundBest.topology as c.SynthNode)));
   }
+
+  console.log(bests);
 }
 
 async function start() {

@@ -21,6 +21,8 @@
         let context;
         let i = 0;
 
+        let running = false;
+
         let bigboye;
 
         async function start() {
@@ -44,6 +46,8 @@
         
 
         async function go() {
+            if (running) return;
+            running = true;
             bigboye = new GainNode(audioContext);
             bigboye.connect(audioContext.destination);
             context.generateSynth();
@@ -51,6 +55,7 @@
             context.cleanUp();
             bigboye.disconnect(audioContext.destination);
             bigboye = undefined;
+            running = false;
         }
 
     </script>
