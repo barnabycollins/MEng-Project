@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+</head>
+<body>
+    <button id="henlo">henlo</button>
+    <button id="go" style="visibility: hidden;">frogge</button>
+    <script type="module">
+        import {Faust} from "faust2webaudio";
+        import * as c from "/src/constructs";
+
+        const henlo_btn = document.getElementById("henlo");
+        const frogge_btn = document.getElementById("go");
+
+        henlo_btn.addEventListener("click", start);
+        frogge_btn.addEventListener("click", go);
+
+        let faust;
+        let audioContext;
+        let context;
+        let i = 0;
+
+        let bigboye;
+
+        async function start() {
+            // Connect to Web Audio
+            audioContext = new window.AudioContext();
+
+            // Enable Faust compiler; wait until it's ready
+            faust = new Faust({
+                debug: true,
+                wasmLocation: "src/libfaust/libfaust-wasm.wasm",
+                dataLocation: "src/libfaust/libfaust-wasm.data"
+            });
+            await faust.ready;
+
+            context = new c.SynthContext(i, audioContext, undefined, true);
+
+            henlo_btn.style.visibility = "hidden";
+            frogge_btn.style.visibility = "visible";
+        }
+
+        
+
+        async function go() {
+            bigboye = new GainNode(audioContext);
+            bigboye.connect(audioContext.destination);
+            context.generateSynth();
+            await context.compile(faust);
+            context.cleanUp();
+            bigboye.disconnect(audioContext.destination);
+            bigboye = undefined;
+        }
+
+    </script>
+</body>
+</html>

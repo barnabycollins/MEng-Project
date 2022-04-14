@@ -639,7 +639,7 @@ class SynthContext {
   }
 
   cleanUp() {
-    console.log(`Cleaning up context ${this.index}`)
+    console.log(`Cleaning up context ${this.index}`);
     this.fullCode = "";
     
     // @ts-ignore (disconnect does exist even though TypeScript says it doesn't)
