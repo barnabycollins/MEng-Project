@@ -11,14 +11,14 @@ function exportToJsonFile(jsonData: any): void {
     linkElement.remove();
 }
 
-function exportListToCsvFile(data: any[]) {
+function exportListToCsvFile(data: any[], name="data") {
     if (data[0] instanceof Array) {
         data = data.map(array => array.join(","));
     }
     let dataStr = data.join("\n");
     let dataUri = 'data:application/csv;charset=utf-8,'+ encodeURIComponent(dataStr);
 
-    let exportFileDefaultName = 'data.csv';
+    let exportFileDefaultName = `${name}.csv`;
 
     let linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
@@ -27,4 +27,15 @@ function exportListToCsvFile(data: any[]) {
     linkElement.remove();
 }
 
-export {exportToJsonFile, exportListToCsvFile};
+function exportObjectToCsvFile(data: {[key:string]: number[]}, name="data") {
+    let csvArray: any[][] = [];
+    const keys = Object.keys(data);
+    csvArray.push(keys);
+    for (let i = 0; i < data[keys[0]].length; i++) {
+        csvArray.push(keys.map(key => data[key][i]));
+    }
+
+    exportListToCsvFile(csvArray, name);
+}
+
+export {exportToJsonFile, exportListToCsvFile, exportObjectToCsvFile};

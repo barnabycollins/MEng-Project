@@ -2,7 +2,7 @@ import {Faust} from "faust2webaudio";
 import {WebMidi, Input, MessageEvent} from "webmidi";
 import * as c from "./constructs";
 import {fitness} from "./genetic";
-import { exportListToCsvFile } from "./export";
+import { exportListToCsvFile, exportObjectToCsvFile } from "./export";
 
 // LOGGING
 const LOG = false;
@@ -134,6 +134,7 @@ function startEvolving() {
   evolving = true;
   (document.getElementById("cover") as HTMLDivElement).style.display = "block";
   (document.getElementById("synth-row") as HTMLDivElement).style.opacity = "0.5";
+  (document.getElementById("evolve-btn") as HTMLButtonElement).classList.add("inactive");
 }
 
 function test(context: c.SynthContext): Promise<number[][]> {
@@ -148,8 +149,8 @@ function test(context: c.SynthContext): Promise<number[][]> {
 }
 
 
-const POPULATION_SIZE = 24;
-const NUM_ROUNDS = 50;
+const POPULATION_SIZE = 16;
+const NUM_ROUNDS = 51;
 const progressBar = document.getElementById("progress-bar") as HTMLDivElement;
 async function evolve() {
   progressBar.style.width = "0px";
@@ -171,6 +172,8 @@ async function evolve() {
   };
 
   let averageFitnesses = [];
+  let maxFitnesses = [];
+  let minFitnesses = [];
 
   for (let i = 0; i < NUM_ROUNDS; i++) {
     progressBar.style.width = `${(i/NUM_ROUNDS)*100}%`;
@@ -207,12 +210,14 @@ async function evolve() {
         }
       }
     }
-    averageFitnesses.push(fitnesses.reduce((a, b) => a + b, 0)/POPULATION_SIZE)
+    averageFitnesses.push(fitnesses.reduce((a, b) => a + b, 0)/POPULATION_SIZE);
+    maxFitnesses.push(Math.max(...fitnesses));
+    minFitnesses.push(Math.min(...fitnesses));
     evolvingContexts.forEach(context => context.setTopology((roundBest.topology as c.SynthNode)));
     progressBar.style.width = "100%";
   }
 
-  exportListToCsvFile(averageFitnesses);
+  exportObjectToCsvFile({"Min": minFitnesses, "Average": averageFitnesses, "Max": maxFitnesses}, `fitness${POPULATION_SIZE}p${NUM_ROUNDS}i`);
 
   console.log(bests);
 }
