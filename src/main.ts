@@ -2,6 +2,7 @@ import {Faust} from "faust2webaudio";
 import {WebMidi, Input, MessageEvent} from "webmidi";
 import * as c from "./constructs";
 import {fitness} from "./genetic";
+import { exportListToCsvFile } from "./export";
 
 // LOGGING
 const LOG = false;
@@ -131,11 +132,14 @@ function showFullCode(i: number) {
 
 function startEvolving() {
   evolving = true;
+  (document.getElementById("cover") as HTMLDivElement).style.display = "block";
+  (document.getElementById("synth-row") as HTMLDivElement).style.opacity = "0.5";
 }
 
 function test(context: c.SynthContext): Promise<number[][]> {
   return new Promise<number[][]>(async (resolve) => {
     context.mutateSynth();
+    //context.generateSynth();
     await context.compile(faust);
     const measurement = await context.measureMFCC();
     context.cleanUp();
@@ -144,7 +148,7 @@ function test(context: c.SynthContext): Promise<number[][]> {
 }
 
 
-const POPULATION_SIZE = 4;
+const POPULATION_SIZE = 24;
 const NUM_ROUNDS = 50;
 const progressBar = document.getElementById("progress-bar") as HTMLDivElement;
 async function evolve() {
@@ -166,6 +170,8 @@ async function evolve() {
     score: 0
   };
 
+  let averageFitnesses = [];
+
   for (let i = 0; i < NUM_ROUNDS; i++) {
     progressBar.style.width = `${(i/NUM_ROUNDS)*100}%`;
 
@@ -177,9 +183,12 @@ async function evolve() {
       score: 0
     };
 
+    let fitnesses = [];
+
     for (let j = 0; j < POPULATION_SIZE; j++) {
       const measurement = measurements[j];
       const currentFitness = fitness(target, measurement);
+      fitnesses.push(currentFitness);
 
       if (currentFitness > roundBest.score) {
         roundBest = {
@@ -198,8 +207,12 @@ async function evolve() {
         }
       }
     }
+    averageFitnesses.push(fitnesses.reduce((a, b) => a + b, 0)/POPULATION_SIZE)
     evolvingContexts.forEach(context => context.setTopology((roundBest.topology as c.SynthNode)));
+    progressBar.style.width = "100%";
   }
+
+  exportListToCsvFile(averageFitnesses);
 
   console.log(bests);
 }

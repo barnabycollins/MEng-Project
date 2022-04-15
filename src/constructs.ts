@@ -340,9 +340,7 @@ class AudioOutput extends SynthNode {
 
 
 
-
-
-
+const MAX_TOPOLOGY_SIZE = 20;
 
 function sample(array: any[]): any {
   return array[~~(Math.random() * array.length)];
@@ -355,7 +353,7 @@ class SynthContext {
   mfccBars: HTMLDivElement[];
 
   topology!: SynthNode;
-  processCode: string;
+  processCode!: string;
   userTopology!: AudioOutput;
   fullCode: string;
   webAudioNode: FaustAudioWorkletNode | undefined;
@@ -434,8 +432,6 @@ class SynthContext {
       this.generateSynth();
     }
 
-    this.processCode = this.topology.getNodeStrings().processCode;
-
     this.params = {
       env_a: "",
       env_d: "",
@@ -444,8 +440,6 @@ class SynthContext {
       lp_freq: "",
       lp_q: ""
     }
-
-    this.addOutputInterface();
   }
 
   setTopology(topology: SynthNode) {
@@ -467,17 +461,25 @@ class SynthContext {
     const rootNodeType = sample(possibleNodes);
     let rootNode = this.generate(rootNodeType);
   
-    while (!rootNode.carriesSound || rootNode.graphSize > 30) {
-      this.resetCounts();
+    while (!rootNode.carriesSound || rootNode.graphSize > MAX_TOPOLOGY_SIZE) {
       rootNode = this.generate(rootNodeType);
     }
   
     this.topology = rootNode;
+
+    this.processCode = rootNode.getNodeStrings().processCode;
+
+    this.addOutputInterface();
   }
 
   mutateSynth() {
-    this.resetCounts();
-    this.topology = this.mutate(this.topology);
+    let rootNode = this.mutate(this.topology);
+    while (!rootNode.carriesSound || rootNode.graphSize > MAX_TOPOLOGY_SIZE) {
+      rootNode = this.mutate(this.topology);
+    }
+
+    this.topology = rootNode;
+    this.processCode = this.topology.getNodeStrings().processCode;
     this.addOutputInterface();
   }
 
@@ -506,7 +508,7 @@ class SynthContext {
   }
 
   async compile(faust: Faust) {
-    console.log(`Context ${this.index} beginning compilation.`);
+    console.log(`Context ${this.index} beginning compilation. Graph contains ${this.userTopology.graphSize} nodes.`);
     const constructedCode = this.userTopology.getOutputString();
 
     this.fullCode = constructedCode;
@@ -553,7 +555,6 @@ class SynthContext {
         lp_q: parameters.filter(i => i.includes('MAIN_LP_Q'))[0]
       };
     }
-    console.log(`Context ${this.index} compiled.`);
   }
 
   mfccCallback(values: number[]) {
@@ -648,7 +649,7 @@ class SynthContext {
   }
 
   cleanUp() {
-    console.log(`Cleaning up context ${this.index}`);
+    //console.log(`Cleaning up context ${this.index}`);
     this.fullCode = "";
     
     // @ts-ignore (disconnect does exist even though TypeScript says it doesn't)
@@ -701,7 +702,7 @@ class SynthContext {
       if (!givenArgs) {
         const numArguments = sample([2, 2, 2, 2, 2, 3, 3, 4]);
     
-        const possibleArgs = [Oscillator, Parameter, MathsNode, MIDIFreq];
+        let possibleArgs = [Parameter, Oscillator, MathsNode, MIDIFreq];
         
         let choices = [];
     
@@ -710,6 +711,9 @@ class SynthContext {
           choices.push(choice);
           if (choice === MIDIFreq) {
             possibleArgs.pop();
+          }
+          if (choice === Parameter) {
+            possibleArgs = possibleArgs.splice(0, 1);
           }
         }
     
@@ -779,8 +783,9 @@ class SynthContext {
   }
 
   mutate(node: BaseNode): BaseNode {
-    const REPLACE_CHANCE = 0.03;
-    const MUTATE_CHANCE = 0.1;
+    const REPLACE_CHANCE = 0.05;
+    const MUTATE_CHANCE = 0.2;
+    const randomValue = Math.random();
 
     const replaceValue = () => {
       const possibleReplacements = [MathsNode, Parameter, MIDIFreq, FrequencyModulator];
@@ -793,7 +798,6 @@ class SynthContext {
     }
 
     if (node instanceof Parameter) {
-      const randomValue = Math.random();
 
       if (randomValue < REPLACE_CHANCE) {
         return replaceValue();
@@ -804,7 +808,6 @@ class SynthContext {
       return this.generate(Parameter, node.defaultValue, node.range);
     }
     else if (node instanceof MIDIFreq) {
-      const randomValue = Math.random();
 
       if (randomValue < REPLACE_CHANCE) {
         return replaceValue();
@@ -815,7 +818,6 @@ class SynthContext {
       return this.generate(MIDIFreq);
     }
     else if (node instanceof MathsNode) {
-      const randomValue = Math.random();
 
       if (randomValue < REPLACE_CHANCE) {
         if (node.carriesSound) {
@@ -831,7 +833,6 @@ class SynthContext {
       return this.generate(MathsNode, node.operation, ...node.inputs.map(this.mutate.bind(this)));
     }
     else if (node instanceof Oscillator) {
-      const randomValue = Math.random();
       
       if (randomValue < REPLACE_CHANCE) {
         return replaceSynth();
@@ -842,7 +843,6 @@ class SynthContext {
       return this.generate(Oscillator, node.waveform, this.mutate(node.frequency));
     }
     else if (node instanceof FrequencyModulator) {
-      const randomValue = Math.random();
 
       if (randomValue < REPLACE_CHANCE) {
         return replaceValue();
