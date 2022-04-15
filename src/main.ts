@@ -156,8 +156,10 @@ async function evolve() {
   const target = await contexts[favouriteContext].measureMFCC();
 
   let evolvingContexts: c.SynthContext[] = [];
+  let workers: Worker[] = [];
   for (let i = 0; i < POPULATION_SIZE; i++) {
     evolvingContexts.push(new c.SynthContext(i, audioContext, undefined, true));
+    workers.push(new Worker("compileWorker.ts"));
   }
 
   let measurements: number[][][];

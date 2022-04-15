@@ -505,16 +505,13 @@ class SynthContext {
     }
   }
 
-  async compile(faust: Faust) {
-    console.log(`Context ${this.index} beginning compilation.`);
+  getCode() {
     const constructedCode = this.userTopology.getOutputString();
 
     this.fullCode = constructedCode;
+  }
 
-    // Compile a new Web Audio node from faust code
-    let node: FaustAudioWorkletNode;
-    node = await faust.getNode(constructedCode, { audioCtx: this.audioContext, useWorklet: true, voices: 4, args: { "-I": "libraries/" } }) as FaustAudioWorkletNode;
-    
+  setNode(node: FaustAudioWorkletNode) {
     // Connect the node's output to Web Audio
     // @ts-ignore (connect does exist even though TypeScript says it doesn't)
     node.connect(this.passthrough);
@@ -553,6 +550,17 @@ class SynthContext {
         lp_q: parameters.filter(i => i.includes('MAIN_LP_Q'))[0]
       };
     }
+  }
+
+  async compile(faust: Faust) {
+    console.log(`Context ${this.index} beginning compilation.`);
+    this.getCode();
+
+    // Compile a new Web Audio node from faust code
+    let node: FaustAudioWorkletNode;
+    node = await faust.getNode(this.fullCode, { audioCtx: this.audioContext, useWorklet: true, voices: 4, args: { "-I": "libraries/" } }) as FaustAudioWorkletNode;
+
+    this.setNode(node);
     console.log(`Context ${this.index} compiled.`);
   }
 
