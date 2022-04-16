@@ -2,8 +2,7 @@ import { FaustAudioWorkletNode, Faust } from "faust2webaudio";
 import Meyda from "meyda";
 import { MeydaAnalyzer } from "meyda/dist/esm/meyda-wa";
 import { SynthNode, AudioOutput, MathsNode, Oscillator, LPFilter, Envelope, Parameter, MIDIGain, BaseNode, Constant, MIDIFreq, FrequencyModulator } from "./constructs";
-
-const MAX_TOPOLOGY_SIZE = 20;
+import { REPLACE_CHANCE, MUTATE_CHANCE, MAX_TOPOLOGY_SIZE } from "./evolution";
 
 function sample(array: any[]): any {
   return array[~~(Math.random() * array.length)];
@@ -62,7 +61,7 @@ function generate(type: new (...args: any[]) => BaseNode, ...nodeArgs: any[]): B
           possibleArgs.pop();
         }
         if (choice === Parameter) {
-          possibleArgs = possibleArgs.splice(0, 1);
+          possibleArgs.splice(0, 1);
         }
       }
   
@@ -132,8 +131,6 @@ function generate(type: new (...args: any[]) => BaseNode, ...nodeArgs: any[]): B
 }
 
 function mutate(node: BaseNode): BaseNode {
-  const REPLACE_CHANCE = 0.05;
-  const MUTATE_CHANCE = 0.2;
   const randomValue = Math.random();
 
   const replaceValue = () => {
@@ -365,7 +362,7 @@ class SynthContext {
   }
 
   async compile(faust: Faust) {
-    console.log(`Context ${this.index} beginning compilation. Graph contains ${this.userTopology.graphSize} nodes.`);
+    //console.log(`Context ${this.index} beginning compilation. Graph contains ${this.userTopology.graphSize} nodes.`);
     const constructedCode = this.userTopology.getOutputString();
 
     this.fullCode = constructedCode;

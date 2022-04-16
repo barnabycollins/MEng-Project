@@ -1,13 +1,39 @@
 import { Faust } from "faust2webaudio";
 import { SynthNode } from "./constructs";
-import { exportObjectToCsvFile } from "./export";
-import { fitness } from "./genetic";
+import { exportObjectToCsvFile } from "./dataExport";
 import { SynthContext } from "./synthContext";
+
+// GLOBAL EVOLUTIONARY ALGORITHM PARAMETERS
+const POPULATION_SIZE = 4;
+const NUM_ROUNDS = 10;
+const REPLACE_CHANCE = 0.01;
+const MUTATE_CHANCE = 0.03;
+
+const MAX_TOPOLOGY_SIZE = 20;
 
 type FitnessType = {
   topology: SynthNode | undefined,
   score: number
 };
+
+
+function fitness(target: number[][], current: number[][]) {
+  const numWindows = target.length;
+  const numCoefficients = target[0].length;
+
+  let distance = 0;
+
+  for (let window = 0; window < numWindows; window++) {
+    let sum = 0;
+    for (let coeff = 0; coeff < numCoefficients; coeff++) {
+      sum += (target[window][coeff] - current[window][coeff])**2;
+    }
+    distance += Math.sqrt(sum);
+  }
+  distance /= numWindows;
+
+  return 1/(1+distance);
+}
 
 function test(context: SynthContext, faust: Faust): Promise<number[][]> {
   return new Promise<number[][]>(async (resolve) => {
@@ -21,17 +47,13 @@ function test(context: SynthContext, faust: Faust): Promise<number[][]> {
 }
 
 class Evolver {
-  populationSize: number;
-  numRounds: number;
   progressBar: HTMLDivElement;
   best: FitnessType;
   bests: FitnessType[];
   audioContext: AudioContext;
   faust: Faust;
 
-  constructor(populationSize: number, numRounds: number, progressBar: HTMLDivElement, faust: Faust, audioContext: AudioContext) {
-    this.populationSize = populationSize;
-    this.numRounds = numRounds;
+  constructor(progressBar: HTMLDivElement, faust: Faust, audioContext: AudioContext) {
     this.progressBar = progressBar;
     this.faust = faust;
     this.audioContext = audioContext;
@@ -46,7 +68,7 @@ class Evolver {
   async evolve(target: number[][]) {
   
     let evolvingContexts: SynthContext[] = [];
-    for (let i = 0; i < this.populationSize; i++) {
+    for (let i = 0; i < POPULATION_SIZE; i++) {
       evolvingContexts.push(new SynthContext(i, this.audioContext, undefined, true));
     }
   
@@ -60,8 +82,8 @@ class Evolver {
     let maxFitnesses = [];
     let minFitnesses = [];
   
-    for (let i = 0; i < this.numRounds; i++) {
-      this.progressBar.style.width = `${(i/this.numRounds)*100}%`;
+    for (let i = 0; i < NUM_ROUNDS; i++) {
+      this.progressBar.style.width = `${(i/NUM_ROUNDS)*100}%`;
   
       console.log(`Starting round ${i}`);
       measurements = await Promise.all(evolvingContexts.map(context => test(context, this.faust)));
@@ -73,7 +95,7 @@ class Evolver {
   
       let fitnesses = [];
   
-      for (let j = 0; j < this.populationSize; j++) {
+      for (let j = 0; j < POPULATION_SIZE; j++) {
         const measurement = measurements[j];
         const currentFitness = fitness(target, measurement);
         fitnesses.push(currentFitness);
@@ -95,17 +117,16 @@ class Evolver {
           }
         }
       }
-      averageFitnesses.push(fitnesses.reduce((a, b) => a + b, 0)/this.populationSize);
+      averageFitnesses.push(fitnesses.reduce((a, b) => a + b, 0)/POPULATION_SIZE);
       maxFitnesses.push(Math.max(...fitnesses));
       minFitnesses.push(Math.min(...fitnesses));
       evolvingContexts.forEach(context => context.setTopology((roundBest.topology as SynthNode)));
-      this.progressBar.style.width = "100%";
     }
   
-    exportObjectToCsvFile({"Min": minFitnesses, "Average": averageFitnesses, "Max": maxFitnesses}, `fitness${this.populationSize}p${this.numRounds}i`);
+    exportObjectToCsvFile({"Min": minFitnesses, "Average": averageFitnesses, "Max": maxFitnesses}, `fitness`, `${POPULATION_SIZE}p`, `${NUM_ROUNDS}i`, `${MUTATE_CHANCE}m`, `${REPLACE_CHANCE}r`, "sine");
   
     return this.bests;
   }
 }
 
-export { Evolver };
+export { Evolver, REPLACE_CHANCE, MUTATE_CHANCE, MAX_TOPOLOGY_SIZE };

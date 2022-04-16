@@ -1,11 +1,9 @@
 import {Faust} from "faust2webaudio";
 import {WebMidi, Input, MessageEvent} from "webmidi";
 import { SynthContext } from "./synthContext";
-import { Evolver } from "./evolver";
+import { Evolver } from "./evolution";
 
 const LOG = false;
-const POPULATION_SIZE = 16;
-const NUM_ROUNDS = 51;
 
 let audioContext: AudioContext;
 let faust: Faust;
@@ -27,10 +25,6 @@ const codeText = document.getElementById("code-box") as HTMLDivElement;
 const screenCover = document.getElementById("cover") as HTMLDivElement;
 const synthUIArea = document.getElementById("synth-row") as HTMLDivElement;
 const progressBar = document.getElementById("progress-bar") as HTMLDivElement;
-const synthPanels: {[key: number]: HTMLDivElement} = {};
-for (let i = 0; i < contextCount; i++) {
-  synthPanels[i] = document.getElementById(`panel${i}`) as HTMLDivElement;
-}
 
 // Generate synth panels
 for (let i = 0; i < contextCount; i++) {
@@ -58,6 +52,10 @@ for (let i = 0; i < contextCount; i++) {
     </div>
   `;
   synthUIArea.innerHTML += panelContent;
+}
+const synthPanels: {[key: number]: HTMLDivElement} = {};
+for (let i = 0; i < contextCount; i++) {
+  synthPanels[i] = document.getElementById(`panel${i}`) as HTMLDivElement;
 }
 
 
@@ -136,7 +134,7 @@ async function evolve() {
   if (evolving || favouriteContext === -1) return;
   evolving = true;
 
-  progressBar.style.width = "0px";
+  progressBar.style.width = "0%";
   screenCover.style.display = "block";
   synthUIArea.style.opacity = "0.5";
   evolveButton.classList.add("inactive");
@@ -144,6 +142,11 @@ async function evolve() {
   const target = await contexts[favouriteContext].measureMFCC();
 
   console.log(await evolver.evolve(target));
+
+  progressBar.style.width = "100%";
+  screenCover.style.display = "none";
+  synthUIArea.style.opacity = "1";
+  //evolveButton.classList.remove("inactive");
 }
 
 async function start() {
@@ -161,7 +164,7 @@ async function start() {
   });
   await faust.ready;
 
-  evolver = new Evolver(POPULATION_SIZE, NUM_ROUNDS, progressBar, faust, audioContext);
+  evolver = new Evolver(progressBar, faust, audioContext);
 
   for (let i = 0; i < contextCount; i++) {
     contexts.push(new SynthContext(i, audioContext));

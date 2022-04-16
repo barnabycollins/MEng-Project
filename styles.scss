@@ -93,7 +93,7 @@ body {
         padding: 0px;
       }
 
-      #evolve-btn {
+      #evolve-btn, #save-btn {
         text-transform: uppercase;
         font-weight: bold;
         font-size: 24px;
@@ -103,6 +103,7 @@ body {
           cursor: default;
           color: #aaaaaa;
         }
+        margin-left: 5px;
       }
     }
 
