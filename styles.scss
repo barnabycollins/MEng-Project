@@ -45,7 +45,7 @@ body {
     }
   }
 
-  #btn-container {
+  #start-screen {
     height: 50vh;
     width: 100vw;
     display: flex;
@@ -59,7 +59,7 @@ body {
     }
   }
 
-  #main-panel {
+  #main-screen {
     display: none; // changed to flex when the program starts
     flex-direction: column;
 

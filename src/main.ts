@@ -1,46 +1,40 @@
 import {Faust} from "faust2webaudio";
 import {WebMidi, Input, MessageEvent} from "webmidi";
-import * as c from "./constructs";
-import {fitness} from "./genetic";
-import { exportListToCsvFile, exportObjectToCsvFile } from "./export";
+import { SynthContext } from "./synthContext";
+import { Evolver } from "./evolver";
 
-// LOGGING
 const LOG = false;
-// @ts-ignore
-function log(toLog: any): void {
-  /**
-   * Log a message if logging is enabled; otherwise do nothing
-   */
-  if (LOG) console.log("(DEBUG)", toLog);
-}
-
-// SOUND OUTPUT
+const POPULATION_SIZE = 16;
+const NUM_ROUNDS = 51;
 
 let audioContext: AudioContext;
 let faust: Faust;
 
-let contexts: c.SynthContext[] = [];
+let contexts: SynthContext[] = [];
 const contextCount = 4;
 let selectedContext = 0;
 let favouriteContext = -1;
 let currentShownCode = "";
+
 let evolving = false;
+let evolver: Evolver;
 
-type BestType = {
-  topology: c.SynthNode | undefined,
-  score: number
-};
-
-let best: BestType = {
-  topology: undefined,
-  score: 0
-};
-
-let bests: BestType[] = [];
-
-const panel = document.getElementById("synth-row") as HTMLDivElement;
+const mainScreen = document.getElementById("main-screen") as HTMLDivElement;
+const topButtonContainer = document.getElementById("start-screen") as HTMLDivElement;
+const evolveButton = document.getElementById("evolve-btn") as HTMLButtonElement;
+const codeOverlay = document.getElementById("code-overlay") as HTMLDivElement;
+const codeText = document.getElementById("code-box") as HTMLDivElement;
+const screenCover = document.getElementById("cover") as HTMLDivElement;
+const synthUIArea = document.getElementById("synth-row") as HTMLDivElement;
+const progressBar = document.getElementById("progress-bar") as HTMLDivElement;
+const synthPanels: {[key: number]: HTMLDivElement} = {};
 for (let i = 0; i < contextCount; i++) {
-  const mfccCoefficientCount = 13; // taken from Meyda.js MFCC
+  synthPanels[i] = document.getElementById(`panel${i}`) as HTMLDivElement;
+}
+
+// Generate synth panels
+for (let i = 0; i < contextCount; i++) {
+  const mfccCoefficientCount = 13; // this is the number that Meyda.js MFCC returns
   let mfccBars = "";
 
   for (let j = 0; j < mfccCoefficientCount; j++) {
@@ -63,7 +57,15 @@ for (let i = 0; i < contextCount; i++) {
       </div>
     </div>
   `;
-  panel.innerHTML += panelContent;
+  synthUIArea.innerHTML += panelContent;
+}
+
+
+function log(toLog: any): void {
+  /**
+   * Log a message if logging is enabled; otherwise do nothing
+   */
+  if (LOG) console.log("(DEBUG)", toLog);
 }
 
 function selectContext(value?: number) {
@@ -71,10 +73,10 @@ function selectContext(value?: number) {
   selectedContext = value;
   for (let i = 0; i < contextCount; i++) {
     if (i === value) {
-      (document.getElementById(`panel${i}`) as HTMLDivElement).classList.add("midi-enabled");
+      synthPanels[i].classList.add("midi-enabled");
     }
     else {
-      (document.getElementById(`panel${i}`) as HTMLDivElement).classList.remove("midi-enabled");
+      synthPanels[i].classList.remove("midi-enabled");
     }
   }
 }
@@ -86,24 +88,24 @@ function stopContext(contextId: number) {
 function selectFavourite(contextId: number) {
   if (contextId === favouriteContext) {
     favouriteContext = -1;
-    (document.getElementById("evolve-btn") as HTMLButtonElement).classList.add("inactive");
+    evolveButton.classList.add("inactive");
   }
   else {
     favouriteContext = contextId;
-    (document.getElementById("evolve-btn") as HTMLButtonElement).classList.remove("inactive");
+    evolveButton.classList.remove("inactive");
   }
   for (let i = 0; i < contextCount; i++) {
     if (i === favouriteContext) {
-      (document.getElementById(`panel${i}`) as HTMLDivElement).classList.add("favourite");
+      synthPanels[i].classList.add("favourite");
     }
     else {
-      (document.getElementById(`panel${i}`) as HTMLDivElement).classList.remove("favourite");
+      synthPanels[i].classList.remove("favourite");
     }
   }
 }
 
 function closeCode() {
-  (document.getElementById("code-overlay") as HTMLDivElement).style.display = "none";
+  codeOverlay.style.display = "none";
 }
 function showProcessCode(i: number) {
   const shownCode = `process${i}`;
@@ -113,8 +115,8 @@ function showProcessCode(i: number) {
   }
   else {
     currentShownCode = shownCode;
-    (document.getElementById("code-box") as HTMLDivElement).innerText = contexts[i].processCode;
-    (document.getElementById("code-overlay") as HTMLDivElement).style.display = "flex";
+    codeText.innerText = contexts[i].processCode;
+    codeOverlay.style.display = "flex";
   }
 }
 function showFullCode(i: number) {
@@ -125,106 +127,28 @@ function showFullCode(i: number) {
   }
   else {
     currentShownCode = shownCode;
-    (document.getElementById("code-box") as HTMLDivElement).innerText = contexts[i].fullCode;
-    (document.getElementById("code-overlay") as HTMLDivElement).style.display = "flex";
+    codeText.innerText = contexts[i].fullCode;
+    codeOverlay.style.display = "flex";
   }
 }
 
-function startEvolving() {
-  evolving = true;
-  (document.getElementById("cover") as HTMLDivElement).style.display = "block";
-  (document.getElementById("synth-row") as HTMLDivElement).style.opacity = "0.5";
-  (document.getElementById("evolve-btn") as HTMLButtonElement).classList.add("inactive");
-}
-
-function test(context: c.SynthContext): Promise<number[][]> {
-  return new Promise<number[][]>(async (resolve) => {
-    context.mutateSynth();
-    //context.generateSynth();
-    await context.compile(faust);
-    const measurement = await context.measureMFCC();
-    context.cleanUp();
-    resolve(measurement);
-  });
-}
-
-
-const POPULATION_SIZE = 16;
-const NUM_ROUNDS = 51;
-const progressBar = document.getElementById("progress-bar") as HTMLDivElement;
 async function evolve() {
-  progressBar.style.width = "0px";
   if (evolving || favouriteContext === -1) return;
+  evolving = true;
 
-  startEvolving();
+  progressBar.style.width = "0px";
+  screenCover.style.display = "block";
+  synthUIArea.style.opacity = "0.5";
+  evolveButton.classList.add("inactive");
 
   const target = await contexts[favouriteContext].measureMFCC();
 
-  let evolvingContexts: c.SynthContext[] = [];
-  for (let i = 0; i < POPULATION_SIZE; i++) {
-    evolvingContexts.push(new c.SynthContext(i, audioContext, undefined, true));
-  }
-
-  let measurements: number[][][];
-  let roundBest: BestType = {
-    topology: undefined,
-    score: 0
-  };
-
-  let averageFitnesses = [];
-  let maxFitnesses = [];
-  let minFitnesses = [];
-
-  for (let i = 0; i < NUM_ROUNDS; i++) {
-    progressBar.style.width = `${(i/NUM_ROUNDS)*100}%`;
-
-    console.log(`Starting round ${i}`);
-    measurements = await Promise.all(evolvingContexts.map(context => test(context)));
-    
-    roundBest = {
-      topology: undefined,
-      score: 0
-    };
-
-    let fitnesses = [];
-
-    for (let j = 0; j < POPULATION_SIZE; j++) {
-      const measurement = measurements[j];
-      const currentFitness = fitness(target, measurement);
-      fitnesses.push(currentFitness);
-
-      if (currentFitness > roundBest.score) {
-        roundBest = {
-          topology: evolvingContexts[j].topology,
-          score: currentFitness
-        };
-
-        if (currentFitness > best.score) {
-          best = {
-            topology: evolvingContexts[j].topology,
-            score: currentFitness
-          };
-
-          bests = [best, ...bests];
-          console.log(`NEW BEST: ${currentFitness}`);
-        }
-      }
-    }
-    averageFitnesses.push(fitnesses.reduce((a, b) => a + b, 0)/POPULATION_SIZE);
-    maxFitnesses.push(Math.max(...fitnesses));
-    minFitnesses.push(Math.min(...fitnesses));
-    evolvingContexts.forEach(context => context.setTopology((roundBest.topology as c.SynthNode)));
-    progressBar.style.width = "100%";
-  }
-
-  exportObjectToCsvFile({"Min": minFitnesses, "Average": averageFitnesses, "Max": maxFitnesses}, `fitness${POPULATION_SIZE}p${NUM_ROUNDS}i`);
-
-  console.log(bests);
+  console.log(await evolver.evolve(target));
 }
 
 async function start() {
-  (document.getElementById("main-panel") as HTMLDivElement).style.display = "flex";
-  (document.getElementById("btn-container") as HTMLDivElement).style.display = "none";
+  mainScreen.style.display = "flex";
+  topButtonContainer.style.display = "none";
 
   // Connect to Web Audio
   audioContext = new window.AudioContext();
@@ -237,27 +161,14 @@ async function start() {
   });
   await faust.ready;
 
+  evolver = new Evolver(POPULATION_SIZE, NUM_ROUNDS, progressBar, faust, audioContext);
+
   for (let i = 0; i < contextCount; i++) {
-    contexts.push(new c.SynthContext(i, audioContext));
+    contexts.push(new SynthContext(i, audioContext));
   }
 
   await Promise.all(contexts.map(context => context.compile(faust)));
 }
-
-for (let i = 0; i < contextCount; i++) {
-  document.getElementById(`ctx-select-${i}`)?.addEventListener("click", () => selectContext(i));
-  document.getElementById(`stop-${i}`)?.addEventListener("click", () => stopContext(i));
-  document.getElementById(`select-favourite-${i}`)?.addEventListener("click", () => selectFavourite(i));
-  document.getElementById(`process-code-show-${i}`)?.addEventListener("click",() => showProcessCode(i));
-  document.getElementById(`full-code-show-${i}`)?.addEventListener("click", () => showFullCode(i));
-}
-
-document.getElementById("code-close")?.addEventListener("click", () => closeCode());
-
-document.getElementById("start-btn")?.addEventListener("click", async () => await start());
-
-document.getElementById("evolve-btn")?.addEventListener("click", () => evolve());
-
 
 // MIDI SETUP
 await WebMidi.enable();
@@ -277,3 +188,15 @@ else {
     });
   });
 }
+
+for (let i = 0; i < contextCount; i++) {
+  document.getElementById(`ctx-select-${i}`)?.addEventListener("click", () => selectContext(i));
+  document.getElementById(`stop-${i}`)?.addEventListener("click", () => stopContext(i));
+  document.getElementById(`select-favourite-${i}`)?.addEventListener("click", () => selectFavourite(i));
+  document.getElementById(`process-code-show-${i}`)?.addEventListener("click",() => showProcessCode(i));
+  document.getElementById(`full-code-show-${i}`)?.addEventListener("click", () => showFullCode(i));
+}
+
+document.getElementById("code-close")?.addEventListener("click", () => closeCode());
+document.getElementById("evolve-btn")?.addEventListener("click", () => evolve());
+document.getElementById("start-btn")?.addEventListener("click", async () => await start());
