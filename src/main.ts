@@ -4,6 +4,7 @@ import { SynthContext } from "./synthContext";
 import { Evolver } from "./evolution";
 
 const LOG = false;
+const MIDI_ENABLED = false;
 
 let audioContext: AudioContext;
 let faust: Faust;
@@ -173,23 +174,25 @@ async function start() {
   await Promise.all(contexts.map(context => context.compile(faust)));
 }
 
-// MIDI SETUP
-await WebMidi.enable();
-const midiDeviceCount = WebMidi.inputs.length;
-if (midiDeviceCount < 1) {
-  console.log("No MIDI input devices detected.");
-  //Array.prototype.forEach.call(document.getElementsByClassName("ctx-select"), (item: HTMLButtonElement) => item.style.display = "none");
-}
-else {
-  console.log(`Detected ${midiDeviceCount} MIDI input device${midiDeviceCount == 1 ? "" : "s"}:\n- ${WebMidi.inputs.map(x => x.name).join("\n- ")}`);
-
-  WebMidi.inputs.forEach((device: Input) => {
-    device.addListener("midimessage", (e: MessageEvent) => {
-      contexts[selectedContext].midiMessage(e.message.data);
-
-      log(`Received ${e.message.type} from ${device.name}`);
+if (MIDI_ENABLED) {
+  // MIDI SETUP
+  await WebMidi.enable();
+  const midiDeviceCount = WebMidi.inputs.length;
+  if (midiDeviceCount < 1) {
+    console.log("No MIDI input devices detected.");
+    //Array.prototype.forEach.call(document.getElementsByClassName("ctx-select"), (item: HTMLButtonElement) => item.style.display = "none");
+  }
+  else {
+    console.log(`Detected ${midiDeviceCount} MIDI input device${midiDeviceCount == 1 ? "" : "s"}:\n- ${WebMidi.inputs.map(x => x.name).join("\n- ")}`);
+  
+    WebMidi.inputs.forEach((device: Input) => {
+      device.addListener("midimessage", (e: MessageEvent) => {
+        contexts[selectedContext].midiMessage(e.message.data);
+  
+        log(`Received ${e.message.type} from ${device.name}`);
+      });
     });
-  });
+  }
 }
 
 for (let i = 0; i < contextCount; i++) {

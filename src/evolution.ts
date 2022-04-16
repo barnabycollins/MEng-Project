@@ -4,10 +4,10 @@ import { exportObjectToCsvFile } from "./dataExport";
 import { SynthContext } from "./synthContext";
 
 // GLOBAL EVOLUTIONARY ALGORITHM PARAMETERS
-const POPULATION_SIZE = 4;
-const NUM_ROUNDS = 10;
-const REPLACE_CHANCE = 0.01;
-const MUTATE_CHANCE = 0.03;
+const POPULATION_SIZE = 8;
+const NUM_ROUNDS = 151;
+const REPLACE_CHANCE = 0.07;
+const MUTATE_CHANCE = 0.2;
 
 const MAX_TOPOLOGY_SIZE = 20;
 
