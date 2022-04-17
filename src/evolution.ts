@@ -6,8 +6,8 @@ import { SynthContext } from "./synthContext";
 // GLOBAL EVOLUTIONARY ALGORITHM PARAMETERS
 const POPULATION_SIZE = 8;
 const NUM_ROUNDS = 51;
-const REPLACE_CHANCE = 0.2;
-const MUTATE_CHANCE = 0.6;
+const REPLACE_CHANCE = 0.1;
+const MUTATE_CHANCE = 0.3;
 
 const MAX_TOPOLOGY_SIZE = 20;
 
@@ -68,7 +68,6 @@ class Evolver {
   evolvingContexts: SynthContext[];
 
   constructor(progressBar: HTMLDivElement, faust: Faust, audioContext: AudioContext, hearEvolution: boolean, minContextNumber: number) {
-    console.log(`evolver: ${hearEvolution}`);
     this.progressBar = progressBar;
     this.faust = faust;
     this.audioContext = audioContext;

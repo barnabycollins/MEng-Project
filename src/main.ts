@@ -5,7 +5,7 @@ import { Evolver } from "./evolution";
 
 const LOG = false;
 const MIDI_ENABLED = true;
-const HEAR_EVOLUTION = false;
+const HEAR_EVOLUTION = true;
 const topologyToUse = undefined;
 
 let audioContext: AudioContext;
