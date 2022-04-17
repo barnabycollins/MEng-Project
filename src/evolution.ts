@@ -4,20 +4,24 @@ import { exportObjectToCsvFile } from "./dataExport";
 import { SynthContext } from "./synthContext";
 
 // GLOBAL EVOLUTIONARY ALGORITHM PARAMETERS
-const POPULATION_SIZE = 1;
-const NUM_ROUNDS = 1;
-const REPLACE_CHANCE = 0.07;
-const MUTATE_CHANCE = 0.2;
+const POPULATION_SIZE = 8;
+const NUM_ROUNDS = 51;
+const REPLACE_CHANCE = 0.2;
+const MUTATE_CHANCE = 0.6;
 
 const MAX_TOPOLOGY_SIZE = 20;
 
-const runInfo = [`fitness`, `${POPULATION_SIZE}p`, `${NUM_ROUNDS}i`, `${MUTATE_CHANCE}m`, `${REPLACE_CHANCE}r`, `sine`, `newFitness`];
+const runInfo = [`${POPULATION_SIZE}p`, `${NUM_ROUNDS}i`, `${MUTATE_CHANCE}m`, `${REPLACE_CHANCE}r`, `nontrivial`];
 
-type FitnessType = {
+type UnresolvedFitnessType = {
   topology: SynthNode | undefined,
   score: number
 };
 
+type ResolvedFitnessType = {
+  topology: SynthNode,
+  score: number
+}
 
 function fitness(target: number[][], current: number[][]) {
   const numWindows = target.length;
@@ -37,29 +41,34 @@ function fitness(target: number[][], current: number[][]) {
   return 1/(1+distance);
 }
 
-function test(context: SynthContext, faust: Faust, mutate: boolean = true): Promise<number[][]> {
-  return new Promise<number[][]>(async (resolve) => {
+function setUp(context: SynthContext, faust: Faust, mutate: boolean = true): Promise<void> {
+  return new Promise<void>(async (resolve) => {
     if (mutate) context.mutateSynth();
     //context.generateSynth();
     //if (regen) context.setTopology(new MathsNode("*", new Oscillator("sine", new MIDIFreq()), new Parameter(0.1)));
     //if (regen) context.setTopology(new MathsNode("*", new Oscillator("saw", new FrequencyModulator(new Parameter(1), new Parameter(0), new Oscillator("square", new MIDIFreq()))), new Parameter()));
     await context.compile(faust);
-    const measurement = await context.measureMFCC();
-    context.cleanUp();
-    resolve(measurement);
+    resolve();
   });
+}
+
+async function measure(context: SynthContext) {
+  const measurement = await context.measureMFCC();
+  context.cleanUp();
+  return measurement;
 }
 
 class Evolver {
   progressBar: HTMLDivElement;
-  best: FitnessType;
-  bests: FitnessType[];
+  best: UnresolvedFitnessType;
+  bests: UnresolvedFitnessType[];
   audioContext: AudioContext;
   faust: Faust;
   testContext: SynthContext;
   evolvingContexts: SynthContext[];
 
-  constructor(progressBar: HTMLDivElement, faust: Faust, audioContext: AudioContext) {
+  constructor(progressBar: HTMLDivElement, faust: Faust, audioContext: AudioContext, hearEvolution: boolean, minContextNumber: number) {
+    console.log(`evolver: ${hearEvolution}`);
     this.progressBar = progressBar;
     this.faust = faust;
     this.audioContext = audioContext;
@@ -69,19 +78,19 @@ class Evolver {
       score: 0
     };
     this.bests = [];
-    this.testContext = new SynthContext(0, audioContext, undefined, true);
-    this.evolvingContexts = new Array(POPULATION_SIZE).fill(0).map((_, i) => new SynthContext(i+1, this.audioContext, undefined, true));
+    this.testContext = new SynthContext(minContextNumber, audioContext, undefined, true, hearEvolution);
+    this.evolvingContexts = new Array(POPULATION_SIZE).fill(0).map((_, i) => new SynthContext(minContextNumber+i+1, this.audioContext, undefined, true, hearEvolution));
   }
 
   async evolve(topology: SynthNode) {
     this.testContext.setTopology(topology);
 
-    const target = await test(this.testContext, this.faust, false);
+    await setUp(this.testContext, this.faust, false);
+    const target = await measure(this.testContext);
   
     this.evolvingContexts.forEach(context => context.generateSynth());
   
-    let measurements: number[][][];
-    let roundBest: FitnessType = {
+    let roundBest: UnresolvedFitnessType = {
       topology: undefined,
       score: 0
     };
@@ -94,8 +103,8 @@ class Evolver {
       this.progressBar.style.width = `${(i/NUM_ROUNDS)*100}%`;
   
       console.log(`Starting round ${i}`);
-      measurements = await Promise.all(this.evolvingContexts.map(context => test(context, this.faust)));
-      
+      await Promise.all(this.evolvingContexts.map(context => setUp(context, this.faust)));
+
       roundBest = {
         topology: undefined,
         score: 0
@@ -104,7 +113,7 @@ class Evolver {
       let fitnesses = [];
   
       for (let j = 0; j < POPULATION_SIZE; j++) {
-        const measurement = measurements[j];
+        const measurement = await measure(this.evolvingContexts[j]);
         const currentFitness = fitness(target, measurement);
         fitnesses.push(currentFitness);
   
@@ -131,9 +140,9 @@ class Evolver {
       this.evolvingContexts.forEach(context => context.setTopology((roundBest.topology as SynthNode)));
     }
   
-    exportObjectToCsvFile({"Min": minFitnesses, "Average": averageFitnesses, "Max": maxFitnesses}, ...runInfo);
+    exportObjectToCsvFile({"Min": minFitnesses, "Average": averageFitnesses, "Max": maxFitnesses}, `fitness`, ...runInfo);
   
-    return this.bests;
+    return (this.bests as ResolvedFitnessType[]);
   }
 }
 

@@ -1,7 +1,7 @@
 import { FaustAudioWorkletNode, Faust } from "faust2webaudio";
 import Meyda from "meyda";
 import { MeydaAnalyzer } from "meyda/dist/esm/meyda-wa";
-import { SynthNode, AudioOutput, MathsNode, Oscillator, LPFilter, Envelope, Parameter, MIDIGain, BaseNode, Constant, MIDIFreq, FrequencyModulator } from "./constructs";
+import { SynthNode, AudioOutput, MathsNode, Oscillator, LPFilter, Envelope, Parameter, MIDIGain, BaseNode, Constant, MIDIFreq, FrequencyModulator, MIDIGate } from "./constructs";
 import { REPLACE_CHANCE, MUTATE_CHANCE, MAX_TOPOLOGY_SIZE } from "./evolution";
 
 function sample(array: any[]): any {
@@ -233,12 +233,13 @@ class SynthContext {
     env_r: string,
     lp_freq: string,
     lp_q: string,
-    midi_freq: string
+    midi_freq: string,
+    gate: string
   };
 
   headless: boolean;
 
-  constructor(index: number, context: AudioContext, topology?: SynthNode, headless: boolean = false) {
+  constructor(index: number, context: AudioContext, topology?: SynthNode, headless: boolean = false, hearEvolution: boolean = false) {
     this.index = index;
     this.uiFrame = document.getElementById(`ui${index}`) as HTMLIFrameElement;
 
@@ -257,8 +258,11 @@ class SynthContext {
     this.passthrough.connect(this.gainNode);
 
     this.headless = headless;
-    if (this.headless) {
+    if (this.headless && !hearEvolution) {
       this.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+    }
+    else if (hearEvolution) {
+      this.gainNode.gain.setValueAtTime(0.5, this.audioContext.currentTime);
     }
     else {
       const mfccCoefficientCount = 13;
@@ -294,7 +298,8 @@ class SynthContext {
       env_r: "",
       lp_freq: "",
       lp_q: "",
-      midi_freq: ""
+      midi_freq: "",
+      gate: ""
     }
   }
 
@@ -343,7 +348,7 @@ class SynthContext {
     if (this.headless) {
       this.userTopology = new AudioOutput([
         // 0.25 gain to avoid clipping
-        new MathsNode("*", this.topology, new MIDIGain(), new Parameter(0.25))
+        new MathsNode("*", this.topology, new MIDIGate(), new Parameter(0.25))
       ]);
     }
     else {
@@ -385,6 +390,7 @@ class SynthContext {
     const parameters = node.getParams();
 
     this.params["midi_freq"] = parameters.filter(i => i.includes('freq'))[0];
+    this.params["gate"] = parameters.filter(i => i.includes('gate'))[0];
 
     if (!this.headless) {
       // UI CONTROLS
@@ -392,15 +398,15 @@ class SynthContext {
       // Find UI iframe
       const uiWindow = this.uiFrame.contentWindow as Window;
       
+      // Send node parameters to the UI for display
+      const msg = {type: "ui", ui: node.getUI()};
+      uiWindow.postMessage(msg, "*");
+      
       // Make the UI update when parameters change on the backend (eg, when a control is modulated by MIDI)
       node.setOutputParamHandler((path: string, value: number) => {
         const msg = {path, value, type: "param"};
         uiWindow.postMessage(msg, "*");
       });
-      
-      // Send node parameters to the UI for display
-      const msg = {type: "ui", ui: node.getUI()};
-      uiWindow.postMessage(msg, "*");
       
       // Add a listener for when we receive control changes from the iframe
       window.addEventListener("message", (e) => {
@@ -414,7 +420,8 @@ class SynthContext {
         env_r: parameters.filter(i => i.includes('MAIN_ENV_R'))[0],
         lp_freq: parameters.filter(i => i.includes('MAIN_LP_FREQ'))[0],
         lp_q: parameters.filter(i => i.includes('MAIN_LP_Q'))[0],
-        midi_freq: this.params.midi_freq
+        midi_freq: this.params.midi_freq,
+        gate: this.params.gate
       };
     }
   }
@@ -498,18 +505,18 @@ class SynthContext {
   async measureNote(frequency: number, node: FaustAudioWorkletNode): Promise<number[]> {
 
     node.setParamValue(this.params.midi_freq, frequency);
-    node.keyOn(0, 0, 0);
+    node.setParamValue(this.params.gate, 1);
 
     // return a Promise that returns the MFCC data upon resolving
     return new Promise((resolve) => {
       let mfccData = Array(13);
       setTimeout(() => {
         mfccData = this.mfccData;
-        node.allNotesOff();
+        node.setParamValue(this.params.gate, 0);
         resolve(mfccData);
         // allows time for the timbre to stabilise
         // (testing with identical sine waves returned low fitness for shorter bursts)
-      }, 8192*1000/this.audioContext.sampleRate);
+      }, 4096*1000/this.audioContext.sampleRate);
     });
   }
 
