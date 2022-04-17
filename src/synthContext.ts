@@ -232,7 +232,8 @@ class SynthContext {
     env_s: string,
     env_r: string,
     lp_freq: string,
-    lp_q: string
+    lp_q: string,
+    midi_freq: string
   };
 
   headless: boolean;
@@ -269,7 +270,7 @@ class SynthContext {
     this.analyser = Meyda.createMeydaAnalyzer({
       "audioContext": this.audioContext,
       "source": this.passthrough,
-      "bufferSize": 512,
+      "bufferSize": 1024,
       "featureExtractors": "mfcc",
       "callback": this.mfccCallback.bind(this)
     });
@@ -280,7 +281,7 @@ class SynthContext {
     this.mfccData = new Array(13).fill(0);
 
     if (topology !== undefined) {
-      this.topology = topology;
+      this.setTopology(topology);
     }
     else {
       this.generateSynth();
@@ -292,7 +293,8 @@ class SynthContext {
       env_s: "",
       env_r: "",
       lp_freq: "",
-      lp_q: ""
+      lp_q: "",
+      midi_freq: ""
     }
   }
 
@@ -339,7 +341,10 @@ class SynthContext {
 
   addOutputInterface() {
     if (this.headless) {
-      this.userTopology = new AudioOutput([this.topology]);
+      this.userTopology = new AudioOutput([
+        // 0.25 gain to avoid clipping
+        new MathsNode("*", this.topology, new MIDIGain(), new Parameter(0.25))
+      ]);
     }
     else {
       this.userTopology = new AudioOutput([
@@ -377,6 +382,10 @@ class SynthContext {
     
     this.webAudioNode = node;
 
+    const parameters = node.getParams();
+
+    this.params["midi_freq"] = parameters.filter(i => i.includes('freq'))[0];
+
     if (!this.headless) {
       // UI CONTROLS
       
@@ -397,8 +406,6 @@ class SynthContext {
       window.addEventListener("message", (e) => {
         node.setParamValue(e.data.path, e.data.value);
       });
-
-      const parameters = node.getParams();
   
       this.params = {
         env_a: parameters.filter(i => i.includes('MAIN_ENV_A'))[0],
@@ -406,7 +413,8 @@ class SynthContext {
         env_s: parameters.filter(i => i.includes('MAIN_ENV_S'))[0],
         env_r: parameters.filter(i => i.includes('MAIN_ENV_R'))[0],
         lp_freq: parameters.filter(i => i.includes('MAIN_LP_FREQ'))[0],
-        lp_q: parameters.filter(i => i.includes('MAIN_LP_Q'))[0]
+        lp_q: parameters.filter(i => i.includes('MAIN_LP_Q'))[0],
+        midi_freq: this.params.midi_freq
       };
     }
   }
@@ -475,9 +483,9 @@ class SynthContext {
       this.checkNodeExists(this.webAudioNode);
 
       let results: number[][] = [];
-      results.push(await this.measureNote(36, this.webAudioNode));   // C2
-      results.push(await this.measureNote(69, this.webAudioNode));   // A4
-      results.push(await this.measureNote(101, this.webAudioNode));  // F7
+      results.push(await this.measureNote(65.41, this.webAudioNode));   // C2
+      results.push(await this.measureNote(440, this.webAudioNode));     // A4
+      results.push(await this.measureNote(2793.83, this.webAudioNode)); // F7
 
       if (!this.headless) {
         await this.stopAnalysing(this.webAudioNode);
@@ -487,23 +495,25 @@ class SynthContext {
     });
   }
 
-  async measureNote(midiNote: number, node: FaustAudioWorkletNode): Promise<number[]> {
+  async measureNote(frequency: number, node: FaustAudioWorkletNode): Promise<number[]> {
 
-    node.keyOn(0, midiNote, 127);
+    node.setParamValue(this.params.midi_freq, frequency);
+    node.keyOn(0, 0, 0);
 
     // return a Promise that returns the MFCC data upon resolving
     return new Promise((resolve) => {
       let mfccData = Array(13);
       setTimeout(() => {
         mfccData = this.mfccData;
-        node.keyOff(0, midiNote, 127);
+        node.allNotesOff();
         resolve(mfccData);
-      }, 4096*1000/this.audioContext.sampleRate);
+        // allows time for the timbre to stabilise
+        // (testing with identical sine waves returned low fitness for shorter bursts)
+      }, 8192*1000/this.audioContext.sampleRate);
     });
   }
 
   cleanUp() {
-    //console.log(`Cleaning up context ${this.index}`);
     this.fullCode = "";
     
     // @ts-ignore (disconnect does exist even though TypeScript says it doesn't)
@@ -511,7 +521,8 @@ class SynthContext {
     this.webAudioNode?.destroy();
     delete this.webAudioNode;
 
-    // Node will now be garbage collected (in theory)!
+    // Node will now be garbage collected in theory
+    // (but isn't in practice - I think this is because faust2webaudio keeps a record of compiled nodes...?)
   }
 }
 

@@ -4,12 +4,14 @@ import { exportObjectToCsvFile } from "./dataExport";
 import { SynthContext } from "./synthContext";
 
 // GLOBAL EVOLUTIONARY ALGORITHM PARAMETERS
-const POPULATION_SIZE = 8;
-const NUM_ROUNDS = 151;
+const POPULATION_SIZE = 1;
+const NUM_ROUNDS = 1;
 const REPLACE_CHANCE = 0.07;
 const MUTATE_CHANCE = 0.2;
 
 const MAX_TOPOLOGY_SIZE = 20;
+
+const runInfo = [`fitness`, `${POPULATION_SIZE}p`, `${NUM_ROUNDS}i`, `${MUTATE_CHANCE}m`, `${REPLACE_CHANCE}r`, `sine`, `newFitness`];
 
 type FitnessType = {
   topology: SynthNode | undefined,
@@ -35,10 +37,12 @@ function fitness(target: number[][], current: number[][]) {
   return 1/(1+distance);
 }
 
-function test(context: SynthContext, faust: Faust): Promise<number[][]> {
+function test(context: SynthContext, faust: Faust, mutate: boolean = true): Promise<number[][]> {
   return new Promise<number[][]>(async (resolve) => {
-    context.mutateSynth();
+    if (mutate) context.mutateSynth();
     //context.generateSynth();
+    //if (regen) context.setTopology(new MathsNode("*", new Oscillator("sine", new MIDIFreq()), new Parameter(0.1)));
+    //if (regen) context.setTopology(new MathsNode("*", new Oscillator("saw", new FrequencyModulator(new Parameter(1), new Parameter(0), new Oscillator("square", new MIDIFreq()))), new Parameter()));
     await context.compile(faust);
     const measurement = await context.measureMFCC();
     context.cleanUp();
@@ -52,6 +56,8 @@ class Evolver {
   bests: FitnessType[];
   audioContext: AudioContext;
   faust: Faust;
+  testContext: SynthContext;
+  evolvingContexts: SynthContext[];
 
   constructor(progressBar: HTMLDivElement, faust: Faust, audioContext: AudioContext) {
     this.progressBar = progressBar;
@@ -63,14 +69,16 @@ class Evolver {
       score: 0
     };
     this.bests = [];
+    this.testContext = new SynthContext(0, audioContext, undefined, true);
+    this.evolvingContexts = new Array(POPULATION_SIZE).fill(0).map((_, i) => new SynthContext(i+1, this.audioContext, undefined, true));
   }
 
-  async evolve(target: number[][]) {
+  async evolve(topology: SynthNode) {
+    this.testContext.setTopology(topology);
+
+    const target = await test(this.testContext, this.faust, false);
   
-    let evolvingContexts: SynthContext[] = [];
-    for (let i = 0; i < POPULATION_SIZE; i++) {
-      evolvingContexts.push(new SynthContext(i, this.audioContext, undefined, true));
-    }
+    this.evolvingContexts.forEach(context => context.generateSynth());
   
     let measurements: number[][][];
     let roundBest: FitnessType = {
@@ -86,7 +94,7 @@ class Evolver {
       this.progressBar.style.width = `${(i/NUM_ROUNDS)*100}%`;
   
       console.log(`Starting round ${i}`);
-      measurements = await Promise.all(evolvingContexts.map(context => test(context, this.faust)));
+      measurements = await Promise.all(this.evolvingContexts.map(context => test(context, this.faust)));
       
       roundBest = {
         topology: undefined,
@@ -102,13 +110,13 @@ class Evolver {
   
         if (currentFitness > roundBest.score) {
           roundBest = {
-            topology: evolvingContexts[j].topology,
+            topology: this.evolvingContexts[j].topology,
             score: currentFitness
           };
   
           if (currentFitness > this.best.score) {
             this.best = {
-              topology: evolvingContexts[j].topology,
+              topology: this.evolvingContexts[j].topology,
               score: currentFitness
             };
   
@@ -120,10 +128,10 @@ class Evolver {
       averageFitnesses.push(fitnesses.reduce((a, b) => a + b, 0)/POPULATION_SIZE);
       maxFitnesses.push(Math.max(...fitnesses));
       minFitnesses.push(Math.min(...fitnesses));
-      evolvingContexts.forEach(context => context.setTopology((roundBest.topology as SynthNode)));
+      this.evolvingContexts.forEach(context => context.setTopology((roundBest.topology as SynthNode)));
     }
   
-    exportObjectToCsvFile({"Min": minFitnesses, "Average": averageFitnesses, "Max": maxFitnesses}, `fitness`, `${POPULATION_SIZE}p`, `${NUM_ROUNDS}i`, `${MUTATE_CHANCE}m`, `${REPLACE_CHANCE}r`, "sine");
+    exportObjectToCsvFile({"Min": minFitnesses, "Average": averageFitnesses, "Max": maxFitnesses}, ...runInfo);
   
     return this.bests;
   }

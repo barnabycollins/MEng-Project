@@ -2,9 +2,11 @@ import {Faust} from "faust2webaudio";
 import {WebMidi, Input, MessageEvent} from "webmidi";
 import { SynthContext } from "./synthContext";
 import { Evolver } from "./evolution";
+import { Oscillator, MIDIFreq } from "./constructs";
 
 const LOG = false;
-const MIDI_ENABLED = false;
+const MIDI_ENABLED = true;
+const topologyToUse = new Oscillator("sine", new MIDIFreq());
 
 let audioContext: AudioContext;
 let faust: Faust;
@@ -140,7 +142,7 @@ async function evolve() {
   synthUIArea.style.opacity = "0.5";
   evolveButton.classList.add("inactive");
 
-  const target = await contexts[favouriteContext].measureMFCC();
+  const target = contexts[favouriteContext].topology;
 
   console.log(await evolver.evolve(target));
 
@@ -168,7 +170,7 @@ async function start() {
   evolver = new Evolver(progressBar, faust, audioContext);
 
   for (let i = 0; i < contextCount; i++) {
-    contexts.push(new SynthContext(i, audioContext));
+    contexts.push(new SynthContext(i, audioContext, topologyToUse));
   }
 
   await Promise.all(contexts.map(context => context.compile(faust)));
