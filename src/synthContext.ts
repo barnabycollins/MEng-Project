@@ -3,7 +3,6 @@ import Meyda from "meyda";
 import { MeydaAnalyzer } from "meyda/dist/esm/meyda-wa";
 import { SynthNode, AudioOutput, MathsNode, Oscillator, LPFilter, Envelope, Parameter, MIDIGain, MIDIGate } from "./constructs";
 import { MAX_TOPOLOGY_SIZE, mutate, generate, sample } from "./evolution";
-import { writeData } from "./main";
 
 
 class SynthContext {
@@ -178,16 +177,14 @@ class SynthContext {
   }
 
   async compile(faust: Faust) {
-    console.log(`Context ${this.index} beginning compilation. Graph contains ${this.userTopology.graphSize} nodes.`);
+    //console.log(`Context ${this.index} beginning compilation. Graph contains ${this.userTopology.graphSize} nodes.`);
     const constructedCode = this.userTopology.getOutputString();
 
     this.fullCode = constructedCode;
 
     // Compile a new Web Audio node from faust code
     let node: FaustAudioWorkletNode;
-    const start = performance.now();
     node = await faust.getNode(constructedCode, { audioCtx: this.audioContext, useWorklet: true, voices: 4, args: { "-I": "libraries/" } }) as FaustAudioWorkletNode;
-    writeData(this.userTopology.graphSize, performance.now()-start);
     
     // Connect the node's output to Web Audio
     // @ts-ignore (connect does exist even though TypeScript says it doesn't)

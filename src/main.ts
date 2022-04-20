@@ -2,7 +2,6 @@ import {Faust} from "faust2webaudio";
 import {WebMidi, Input, MessageEvent} from "webmidi";
 import { SynthContext } from "./synthContext";
 import { Evolver } from "./evolution";
-import { exportListToCsvFile } from "./dataExport";
 
 // TODO: use OfflineAudioContext??
 // TODO: use other Meyda thing rather than the callback system?
@@ -16,7 +15,7 @@ let audioContext: AudioContext;
 let faust: Faust;
 
 let contexts: SynthContext[] = [];
-const contextCount = 10;
+const contextCount = 4;
 let selectedContext = 0;
 let favouriteContext = -1;
 let currentShownCode = "";
@@ -43,11 +42,14 @@ export function synchronousPromiseExecute(jobs: any[]): Promise<any[]> {
   })
 }
 
+/*
+// for getting data from other modules to export
 let compilationData: number[][] = [[], []];
-
+import { exportListToCsvFile } from "./dataExport";
 export function writeData(graphSize: number, time: number) {
   compilationData.push([graphSize, time]);
 }
+*/
 
 // Generate synth panels
 for (let i = 0; i < contextCount; i++) {
@@ -204,8 +206,7 @@ async function start() {
     contexts.push(new SynthContext(i, audioContext, topologyToUse));
   }
 
-  await synchronousPromiseExecute(contexts.map(context => context.compile.bind(context, faust)));
-  exportListToCsvFile(compilationData);
+  await Promise.all(contexts.map(context => context.compile.bind(context, faust)));
 
   if (MIDI_ENABLED) {
     // MIDI SETUP
@@ -213,7 +214,7 @@ async function start() {
     const midiDeviceCount = WebMidi.inputs.length;
     if (midiDeviceCount < 1) {
       console.log("No MIDI input devices detected.");
-      //Array.prototype.forEach.call(document.getElementsByClassName("ctx-select"), (item: HTMLButtonElement) => item.style.display = "none");
+      Array.prototype.forEach.call(document.getElementsByClassName("ctx-select"), (item: HTMLButtonElement) => item.style.display = "none");
     }
     else {
       console.log(`Detected ${midiDeviceCount} MIDI input device${midiDeviceCount == 1 ? "" : "s"}:\n- ${WebMidi.inputs.map(x => x.name).join("\n- ")}`);
