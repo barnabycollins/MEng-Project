@@ -9,7 +9,7 @@ const NUM_ROUNDS = 51;
 const REPLACE_CHANCE = 0.1;
 const MUTATE_CHANCE = 0.3;
 
-const MAX_TOPOLOGY_SIZE = 20;
+const MAX_TOPOLOGY_SIZE = 100;
 
 const runInfo = [`${POPULATION_SIZE}p`, `${NUM_ROUNDS}i`, `${MUTATE_CHANCE}m`, `${REPLACE_CHANCE}r`, `nontrivial`];
 

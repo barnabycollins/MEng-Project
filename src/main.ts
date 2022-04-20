@@ -2,17 +2,21 @@ import {Faust} from "faust2webaudio";
 import {WebMidi, Input, MessageEvent} from "webmidi";
 import { SynthContext } from "./synthContext";
 import { Evolver } from "./evolution";
+import { exportListToCsvFile } from "./dataExport";
+
+// TODO: use OfflineAudioContext??
+// TODO: use other Meyda thing rather than the callback system?
 
 const LOG = false;
 const MIDI_ENABLED = true;
-const HEAR_EVOLUTION = true;
+const HEAR_EVOLUTION = false;
 const topologyToUse = undefined;
 
 let audioContext: AudioContext;
 let faust: Faust;
 
 let contexts: SynthContext[] = [];
-const contextCount = 4;
+const contextCount = 10;
 let selectedContext = 0;
 let favouriteContext = -1;
 let currentShownCode = "";
@@ -28,6 +32,22 @@ const codeText = document.getElementById("code-box") as HTMLDivElement;
 const screenCover = document.getElementById("cover") as HTMLDivElement;
 const synthUIArea = document.getElementById("synth-row") as HTMLDivElement;
 const progressBar = document.getElementById("progress-bar") as HTMLDivElement;
+
+export function synchronousPromiseExecute(jobs: any[]): Promise<any[]> {
+  return new Promise(async resolve => {
+    let output = [];
+    for (let i = 0; i < jobs.length; i++) {
+      output.push(await jobs[i]());
+    }
+    resolve(output);
+  })
+}
+
+let compilationData: number[][] = [[], []];
+
+export function writeData(graphSize: number, time: number) {
+  compilationData.push([graphSize, time]);
+}
 
 // Generate synth panels
 for (let i = 0; i < contextCount; i++) {
@@ -184,7 +204,8 @@ async function start() {
     contexts.push(new SynthContext(i, audioContext, topologyToUse));
   }
 
-  await Promise.all(contexts.map(context => context.compile(faust)));
+  await synchronousPromiseExecute(contexts.map(context => context.compile.bind(context, faust)));
+  exportListToCsvFile(compilationData);
 
   if (MIDI_ENABLED) {
     // MIDI SETUP
