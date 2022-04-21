@@ -5,6 +5,8 @@ import { Evolver } from "./evolution";
 
 // TODO: use OfflineAudioContext??
 // TODO: use other Meyda thing rather than the callback system?
+// TODO: add patch copy button, and add it to section 3.4
+// TODO: delete and reinitialise Faust after each round?
 
 const LOG = false;
 const MIDI_ENABLED = true;
@@ -155,6 +157,51 @@ function showFullCode(i: number) {
   }
 }
 
+async function start() {
+  mainScreen.style.display = "flex";
+  topButtonContainer.style.display = "none";
+
+  // Connect to Web Audio
+  audioContext = new window.AudioContext();
+
+  // Enable Faust compiler; wait until it's ready
+  faust = new Faust({
+    debug: LOG,
+    wasmLocation: "src/libfaust/libfaust-wasm.wasm",
+    dataLocation: "src/libfaust/libfaust-wasm.data"
+  });
+  await faust.ready;
+
+  evolver = new Evolver(progressBar, faust, audioContext, HEAR_EVOLUTION, contextCount);
+
+  for (let i = 0; i < contextCount; i++) {
+    contexts.push(new SynthContext(i, audioContext, topologyToUse));
+  }
+
+  await Promise.all(contexts.map(context => context.compile(faust)));
+
+  if (MIDI_ENABLED) {
+    // MIDI SETUP
+    await WebMidi.enable();
+    const midiDeviceCount = WebMidi.inputs.length;
+    if (midiDeviceCount < 1) {
+      console.log("No MIDI input devices detected.");
+      Array.prototype.forEach.call(document.getElementsByClassName("ctx-select"), (item: HTMLButtonElement) => item.style.display = "none");
+    }
+    else {
+      console.log(`Detected ${midiDeviceCount} MIDI input device${midiDeviceCount == 1 ? "" : "s"}:\n- ${WebMidi.inputs.map(x => x.name).join("\n- ")}`);
+    
+      WebMidi.inputs.forEach((device: Input) => {
+        device.addListener("midimessage", (e: MessageEvent) => {
+          contexts[selectedContext].midiMessage(e.message.data);
+    
+          log(`Received ${e.message.type} from ${device.name}`);
+        });
+      });
+    }
+  }
+}
+
 async function evolve() {
   if (evolving || favouriteContext === -1) return;
   evolving = true;
@@ -177,57 +224,20 @@ async function evolve() {
     }
   }
 
+  faust = new Faust({
+    debug: LOG,
+    wasmLocation: "src/libfaust/libfaust-wasm.wasm",
+    dataLocation: "src/libfaust/libfaust-wasm.data"
+  });
+
+  await faust.ready;
+
   await Promise.all(contexts.map(context => context.compile(faust)));
 
   progressBar.style.width = "100%";
   screenCover.style.display = "none";
   synthUIArea.style.opacity = "1";
   //evolveButton.classList.remove("inactive");
-}
-
-async function start() {
-  mainScreen.style.display = "flex";
-  topButtonContainer.style.display = "none";
-
-  // Connect to Web Audio
-  audioContext = new window.AudioContext();
-
-  // Enable Faust compiler; wait until it's ready
-  faust = new Faust({
-    debug: LOG,
-    wasmLocation: "src/libfaust/libfaust-wasm.wasm",
-    dataLocation: "src/libfaust/libfaust-wasm.data"
-  });
-  await faust.ready;
-
-  evolver = new Evolver(progressBar, faust, audioContext, HEAR_EVOLUTION, contextCount);
-
-  for (let i = 0; i < contextCount; i++) {
-    contexts.push(new SynthContext(i, audioContext, topologyToUse));
-  }
-
-  await Promise.all(contexts.map(context => context.compile.bind(context, faust)));
-
-  if (MIDI_ENABLED) {
-    // MIDI SETUP
-    await WebMidi.enable();
-    const midiDeviceCount = WebMidi.inputs.length;
-    if (midiDeviceCount < 1) {
-      console.log("No MIDI input devices detected.");
-      Array.prototype.forEach.call(document.getElementsByClassName("ctx-select"), (item: HTMLButtonElement) => item.style.display = "none");
-    }
-    else {
-      console.log(`Detected ${midiDeviceCount} MIDI input device${midiDeviceCount == 1 ? "" : "s"}:\n- ${WebMidi.inputs.map(x => x.name).join("\n- ")}`);
-    
-      WebMidi.inputs.forEach((device: Input) => {
-        device.addListener("midimessage", (e: MessageEvent) => {
-          contexts[selectedContext].midiMessage(e.message.data);
-    
-          log(`Received ${e.message.type} from ${device.name}`);
-        });
-      });
-    }
-  }
 }
 
 for (let i = 0; i < contextCount; i++) {

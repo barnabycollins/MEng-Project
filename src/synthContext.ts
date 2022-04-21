@@ -160,14 +160,14 @@ class SynthContext {
       this.userTopology = new AudioOutput([
         new LPFilter(
           new MathsNode('*',
+            this.topology,
             new Envelope(
               new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_A`),
               new Parameter(0.3, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_D`),
               new Parameter(0.8, {min: 0, max: 1, step: 0.01}, `MAIN_ENV_S`),
               new Parameter(0.01, {min: 0, max: 10, step: 0.01}, `MAIN_ENV_R`)
             ),
-            new MIDIGain(),
-            this.topology
+            new MIDIGain()
           ),
           new Parameter(20000, {min: 20, max: 20000, step: 1}, `MAIN_LP_FREQ`),
           new Parameter(0.5, {min: 0.1, max: 30, step: 0.1}, `MAIN_LP_Q`)
