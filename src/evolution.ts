@@ -5,13 +5,13 @@ import { SynthContext } from "./synthContext";
 
 // GLOBAL EVOLUTIONARY ALGORITHM PARAMETERS
 const POPULATION_SIZE = 8;
-const NUM_ROUNDS = 51;
+const GENERATION_COUNT = 51;
 const REPLACE_CHANCE = 0.1;
 const MUTATE_CHANCE = 0.3;
 
 const MAX_TOPOLOGY_SIZE = 30;
 
-const runInfo = [`${POPULATION_SIZE}p`, `${NUM_ROUNDS}i`, `${MUTATE_CHANCE}m`, `${REPLACE_CHANCE}r`, `nontrivial`];
+const runInfo = [`${POPULATION_SIZE}p`, `${GENERATION_COUNT}i`, `${MUTATE_CHANCE}m`, `${REPLACE_CHANCE}r`, `nontrivial`];
 
 type UnresolvedFitnessType = {
   topology: SynthNode | undefined,
@@ -102,8 +102,8 @@ class Evolver {
     let maxFitnesses = [];
     let minFitnesses = [];
   
-    for (let i = 0; i < NUM_ROUNDS; i++) {
-      this.progressBar.style.width = `${(i/NUM_ROUNDS)*100}%`;
+    for (let i = 0; i < GENERATION_COUNT; i++) {
+      this.progressBar.style.width = `${(i/GENERATION_COUNT)*100}%`;
   
       console.log(`Starting round ${i}`);
       await Promise.all(this.evolvingContexts.map(context => setUpContext(context, this.faust)));
@@ -351,4 +351,4 @@ function mutate(node: BaseNode): BaseNode {
   throw new Error("You need to provide a valid node to mutate()!");
 }
 
-export { Evolver, POPULATION_SIZE, NUM_ROUNDS, REPLACE_CHANCE, MUTATE_CHANCE, MAX_TOPOLOGY_SIZE, mutate, generate, sample };
+export { Evolver, POPULATION_SIZE, GENERATION_COUNT as NUM_ROUNDS, REPLACE_CHANCE, MUTATE_CHANCE, MAX_TOPOLOGY_SIZE, mutate, generate, sample };
