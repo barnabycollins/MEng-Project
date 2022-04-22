@@ -351,4 +351,4 @@ function mutate(node: BaseNode): BaseNode {
   throw new Error("You need to provide a valid node to mutate()!");
 }
 
-export { Evolver, REPLACE_CHANCE, MUTATE_CHANCE, MAX_TOPOLOGY_SIZE, mutate, generate, sample };
+export { Evolver, POPULATION_SIZE, NUM_ROUNDS, REPLACE_CHANCE, MUTATE_CHANCE, MAX_TOPOLOGY_SIZE, mutate, generate, sample };

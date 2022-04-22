@@ -1,7 +1,7 @@
 import {Faust} from "faust2webaudio";
 import {WebMidi, Input, MessageEvent} from "webmidi";
 import { SynthContext } from "./synthContext";
-import { Evolver } from "./evolution";
+import { Evolver, NUM_ROUNDS, POPULATION_SIZE } from "./evolution";
 
 // TODO: use OfflineAudioContext??
 // TODO: use other Meyda thing rather than the callback system?
@@ -213,7 +213,9 @@ async function evolve() {
 
   const target = contexts[favouriteContext].topology;
 
+  const startTime = performance.now();
   const results = await evolver.evolve(target);
+  console.log(`${POPULATION_SIZE},${NUM_ROUNDS},${(performance.now()-startTime)/1000}`);
 
   for (let i = 0; i < contextCount; i++) {
     if (i < contextCount-1 && i < results.length) {
