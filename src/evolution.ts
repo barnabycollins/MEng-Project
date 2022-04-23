@@ -1,6 +1,6 @@
 import { Faust } from "faust2webaudio";
 import { BaseNode, Constant, FrequencyModulator, MathsNode, MIDIFreq, Oscillator, Parameter, SynthNode } from "./constructs";
-import { exportObjectToCsvFile } from "./dataExport";
+import { exportListToCsvFile } from "./dataExport";
 import { SynthContext } from "./synthContext";
 
 // GLOBAL EVOLUTIONARY ALGORITHM PARAMETERS
@@ -98,9 +98,7 @@ class Evolver {
       score: 0
     };
   
-    let averageFitnesses = [];
-    let maxFitnesses = [];
-    let minFitnesses = [];
+    let allFitnesses = [];
   
     for (let i = 1; i <= GENERATION_COUNT; i++) {
       this.progressBar.style.width = `${(i/GENERATION_COUNT)*100}%`;
@@ -137,13 +135,13 @@ class Evolver {
           }
         }
       }
-      averageFitnesses.push(fitnesses.reduce((a, b) => a + b, 0)/POPULATION_SIZE);
-      maxFitnesses.push(Math.max(...fitnesses));
-      minFitnesses.push(Math.min(...fitnesses));
+
+      allFitnesses.push(fitnesses);
+      
       this.evolvingContexts.forEach(context => context.setTopology((roundBest.topology as SynthNode)));
     }
   
-    exportObjectToCsvFile({"Min": minFitnesses, "Average": averageFitnesses, "Max": maxFitnesses}, `fitness`, ...runInfo);
+    exportListToCsvFile(allFitnesses, `fitness`, ...runInfo);
   
     return (this.bests as ResolvedFitnessType[]);
   }
