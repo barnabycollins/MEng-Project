@@ -13,6 +13,8 @@ const MIDI_ENABLED = true;
 const HEAR_EVOLUTION = false;
 const topologyToUse = undefined;
 
+let midiPresent = false;
+
 let audioContext: AudioContext;
 let faust: Faust;
 
@@ -94,6 +96,7 @@ function log(toLog: any): void {
 }
 
 function selectContext(value?: number) {
+  if (!midiPresent) return;
   if (value === undefined) value = (selectedContext + 1) % contextCount;
   selectedContext = value;
   for (let i = 0; i < contextCount; i++) {
@@ -186,11 +189,13 @@ async function start() {
     const midiDeviceCount = WebMidi.inputs.length;
     if (midiDeviceCount < 1) {
       console.log("No MIDI input devices detected.");
-      Array.prototype.forEach.call(document.getElementsByClassName("ctx-select"), (item: HTMLButtonElement) => item.style.display = "none");
+      Array.prototype.forEach.call(document.getElementsByClassName("ctx-select"), (item: HTMLButtonElement) => item.classList.add("inactive"));
     }
     else {
       console.log(`Detected ${midiDeviceCount} MIDI input device${midiDeviceCount == 1 ? "" : "s"}:\n- ${WebMidi.inputs.map(x => x.name).join("\n- ")}`);
-    
+      
+      midiPresent = true;
+
       WebMidi.inputs.forEach((device: Input) => {
         device.addListener("midimessage", (e: MessageEvent) => {
           contexts[selectedContext].midiMessage(e.message.data);
