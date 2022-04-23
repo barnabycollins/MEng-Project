@@ -4,8 +4,8 @@ import { exportObjectToCsvFile } from "./dataExport";
 import { SynthContext } from "./synthContext";
 
 // GLOBAL EVOLUTIONARY ALGORITHM PARAMETERS
-const POPULATION_SIZE = 8;
-const GENERATION_COUNT = 51;
+const POPULATION_SIZE = 4;
+const GENERATION_COUNT = 50;
 const REPLACE_CHANCE = 0.1;
 const MUTATE_CHANCE = 0.3;
 
@@ -102,7 +102,7 @@ class Evolver {
     let maxFitnesses = [];
     let minFitnesses = [];
   
-    for (let i = 0; i < GENERATION_COUNT; i++) {
+    for (let i = 1; i <= GENERATION_COUNT; i++) {
       this.progressBar.style.width = `${(i/GENERATION_COUNT)*100}%`;
   
       console.log(`Starting round ${i}`);
