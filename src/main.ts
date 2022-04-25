@@ -190,11 +190,14 @@ async function start() {
     if (midiDeviceCount < 1) {
       console.log("No MIDI input devices detected.");
       Array.prototype.forEach.call(document.getElementsByClassName("ctx-select"), (item: HTMLButtonElement) => item.classList.add("inactive"));
+      Array.prototype.forEach.call(document.getElementsByClassName("indicators"), (item: HTMLButtonElement) => item.classList.add("midi-disabled"));
     }
     else {
       console.log(`Detected ${midiDeviceCount} MIDI input device${midiDeviceCount == 1 ? "" : "s"}:\n- ${WebMidi.inputs.map(x => x.name).join("\n- ")}`);
       
       midiPresent = true;
+
+      selectContext(0);
 
       WebMidi.inputs.forEach((device: Input) => {
         device.addListener("midimessage", (e: MessageEvent) => {
@@ -212,8 +215,8 @@ async function evolve() {
   evolving = true;
 
   progressBar.style.width = "0%";
-  screenCover.style.display = "block";
-  synthUIArea.style.opacity = "0.5";
+  //screenCover.style.display = "block";
+  //synthUIArea.style.opacity = "0.5";
   evolveButton.classList.add("inactive");
 
   const target = contexts[favouriteContext].topology;
@@ -242,8 +245,8 @@ async function evolve() {
   await Promise.all(contexts.map(context => context.compile(faust)));
 
   progressBar.style.width = "100%";
-  screenCover.style.display = "none";
-  synthUIArea.style.opacity = "1";
+  //screenCover.style.display = "none";
+  //synthUIArea.style.opacity = "1";
   //evolveButton.classList.remove("inactive");
 }
 

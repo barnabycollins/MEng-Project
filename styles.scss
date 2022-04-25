@@ -127,7 +127,9 @@ body {
           margin: 5px 0px;
           padding: 1px 0px;
 
-          border-top: 5px solid #ffffff00;
+          &:not(.midi-disabled) {
+            border-top: 5px solid #ffffff00;
+          }
           border-bottom: 5px solid #ffffff00;
           
           transition: border-color 0.3s;
