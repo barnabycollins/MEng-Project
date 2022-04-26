@@ -221,15 +221,14 @@ async function evolve() {
 
   const target = contexts[favouriteContext].topology;
 
-  const startTime = performance.now();
   const results = await evolver.evolve(target);
-  console.log(`${POPULATION_SIZE},${GENERATION_COUNT},${(performance.now()-startTime)/1000}`);
 
   for (let i = 0; i < contextCount; i++) {
-    if (i < contextCount-1 && i < results.length) {
+    if (/*i < contextCount-1 && */i < results.length) {
       contexts[i].setTopology(results[i].topology);
     }
     else {
+      // Fill any extra slots with a random patch
       contexts[i].generateSynth();
     }
   }
@@ -247,7 +246,9 @@ async function evolve() {
   progressBar.style.width = "100%";
   //screenCover.style.display = "none";
   //synthUIArea.style.opacity = "1";
-  //evolveButton.classList.remove("inactive");
+  evolveButton.classList.remove("inactive");
+  
+  evolving = false;
 }
 
 for (let i = 0; i < contextCount; i++) {

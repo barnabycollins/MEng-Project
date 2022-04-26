@@ -11,7 +11,7 @@ const MUTATE_CHANCE = 0.3;    // p_m
 
 const MAX_TOPOLOGY_SIZE = 30;
 
-const runInfo = [`${POPULATION_SIZE}p`, `${GENERATION_COUNT}i`, `${MUTATE_CHANCE}m`, `${REPLACE_CHANCE}r`, `nontrivial`];
+const runInfo = [`trivial`, `x`];
 
 type UnresolvedFitnessType = {
   topology: SynthNode | undefined,
