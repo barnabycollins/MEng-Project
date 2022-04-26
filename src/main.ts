@@ -1,7 +1,8 @@
 import {Faust} from "faust2webaudio";
 import {WebMidi, Input, MessageEvent} from "webmidi";
 import { SynthContext } from "./synthContext";
-import { Evolver, GENERATION_COUNT, POPULATION_SIZE } from "./evolution";
+import { Evolver } from "./evolution";
+import { exportFaustCode } from "./dataExport";
 
 // TODO: use OfflineAudioContext??
 // TODO: use other Meyda thing rather than the callback system?
@@ -32,7 +33,7 @@ const topButtonContainer = document.getElementById("start-screen") as HTMLDivEle
 const evolveButton = document.getElementById("evolve-btn") as HTMLButtonElement;
 const codeOverlay = document.getElementById("code-overlay") as HTMLDivElement;
 const codeText = document.getElementById("code-box") as HTMLDivElement;
-const screenCover = document.getElementById("cover") as HTMLDivElement;
+//const screenCover = document.getElementById("cover") as HTMLDivElement;
 const synthUIArea = document.getElementById("synth-row") as HTMLDivElement;
 const progressBar = document.getElementById("progress-bar") as HTMLDivElement;
 
@@ -159,6 +160,15 @@ function showFullCode(i: number) {
     codeOverlay.style.display = "flex";
   }
 }
+async function copyCode() {
+  const code = codeText.innerText;
+  await navigator.clipboard.writeText(code);
+  console.log("yes");
+}
+async function saveCode() {
+  const code = codeText.innerText;
+  await exportFaustCode(code);
+}
 
 async function start() {
   mainScreen.style.display = "flex";
@@ -260,5 +270,8 @@ for (let i = 0; i < contextCount; i++) {
 }
 
 document.getElementById("code-close")?.addEventListener("click", () => closeCode());
+document.getElementById("code-copy")?.addEventListener("click", async () => copyCode());
+document.getElementById("code-save")?.addEventListener("click", async () => saveCode());
+
 document.getElementById("evolve-btn")?.addEventListener("click", () => evolve());
 document.getElementById("start-btn")?.addEventListener("click", async () => await start());

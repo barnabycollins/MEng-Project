@@ -51,7 +51,6 @@ async function exportListToCsvFile(data: any[], name="data", ...info: string[]) 
         linkElement.remove();
     }
 }
-
 function exportObjectToCsvFile(data: {[key:string]: number[]}, name="data", ...info: string[]) {
     let csvArray: any[][] = [];
     const keys = Object.keys(data);
@@ -63,4 +62,17 @@ function exportObjectToCsvFile(data: {[key:string]: number[]}, name="data", ...i
     exportListToCsvFile(csvArray, name, ...info);
 }
 
-export {exportToJsonFile, exportListToCsvFile, exportObjectToCsvFile};
+async function exportFaustCode(code: string) {
+
+    const fileName = `Synth Explorer Patch (${new Date().toString().split(" GMT")[0]}).dsp`;
+    
+    // @ts-ignore
+    const fileHandle: FileSystemFileHandle = await window.showSaveFilePicker({suggestedName: fileName, types: [{description: "Faust DSP Code", accept: {"text/dsp": [".dsp"]}}]});
+    // @ts-ignore
+    const writable = await fileHandle.createWritable();
+  
+    await writable.write(code);
+    await writable.close();
+}
+
+export {exportToJsonFile, exportListToCsvFile, exportObjectToCsvFile, exportFaustCode};

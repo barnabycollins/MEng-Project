@@ -37,11 +37,24 @@ body {
       font-family: monospace;
       flex-grow: 1;
     }
-
-    #code-close {
-      cursor: pointer;
-      font-weight: bold;
+    
+    #code-btns {
       margin-left: 10px;
+
+      button {
+        cursor: pointer;
+        font-weight: bold;
+        padding: 5px 5px 3px;
+
+        &:not(:last-child) {
+          margin-bottom: 10px;
+        }
+
+        img {
+          width: 20px;
+          height: 20px;
+        }
+      }
     }
   }
 
