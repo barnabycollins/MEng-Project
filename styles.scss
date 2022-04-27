@@ -33,6 +33,14 @@ body {
 
     box-shadow: 0px 0px 10px -5px #000000;
 
+    &.showing-process-code {
+      #code-btns {
+        button#code-copy, button#code-save {
+          display: none;
+        }
+      }
+    }
+
     #code-box {
       font-family: monospace;
       flex-grow: 1;
@@ -138,10 +146,10 @@ body {
 
         .indicators {
           margin: 5px 0px;
-          padding: 1px 0px;
 
           &:not(.midi-disabled) {
             border-top: 5px solid #ffffff00;
+            padding: 1px 0px;
           }
           border-bottom: 5px solid #ffffff00;
           

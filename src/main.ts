@@ -145,6 +145,7 @@ function showProcessCode(i: number) {
   else {
     currentShownCode = shownCode;
     codeText.innerText = contexts[i].processCode;
+    codeOverlay.classList.add("showing-process-code");
     codeOverlay.style.display = "flex";
   }
 }
@@ -157,6 +158,7 @@ function showFullCode(i: number) {
   else {
     currentShownCode = shownCode;
     codeText.innerText = contexts[i].fullCode;
+    codeOverlay.classList.remove("showing-process-code");
     codeOverlay.style.display = "flex";
   }
 }
