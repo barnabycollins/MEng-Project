@@ -2,11 +2,19 @@ import {Faust} from "faust2webaudio";
 import {WebMidi, Input, MessageEvent} from "webmidi";
 import { SynthContext } from "./synthContext";
 import { Evolver } from "./evolution";
+import { exportFaustCode } from "./dataExport";
+
+// TODO: use OfflineAudioContext??
+// TODO: use other Meyda thing rather than the callback system?
+// TODO: add patch copy button, and add it to section 3.4
+// TODO: delete and reinitialise Faust after each round?
 
 const LOG = false;
 const MIDI_ENABLED = true;
-const HEAR_EVOLUTION = true;
+const HEAR_EVOLUTION = false;
 const topologyToUse = undefined;
+
+let midiPresent = false;
 
 let audioContext: AudioContext;
 let faust: Faust;
@@ -25,9 +33,28 @@ const topButtonContainer = document.getElementById("start-screen") as HTMLDivEle
 const evolveButton = document.getElementById("evolve-btn") as HTMLButtonElement;
 const codeOverlay = document.getElementById("code-overlay") as HTMLDivElement;
 const codeText = document.getElementById("code-box") as HTMLDivElement;
-const screenCover = document.getElementById("cover") as HTMLDivElement;
+//const screenCover = document.getElementById("cover") as HTMLDivElement;
 const synthUIArea = document.getElementById("synth-row") as HTMLDivElement;
 const progressBar = document.getElementById("progress-bar") as HTMLDivElement;
+
+export function synchronousPromiseExecute(jobs: any[]): Promise<any[]> {
+  return new Promise(async resolve => {
+    let output = [];
+    for (let i = 0; i < jobs.length; i++) {
+      output.push(await jobs[i]());
+    }
+    resolve(output);
+  })
+}
+
+/*
+// for getting data from other modules to export
+let compilationData: number[][] = [[], []];
+import { exportListToCsvFile } from "./dataExport";
+export function writeData(graphSize: number, time: number) {
+  compilationData.push([graphSize, time]);
+}
+*/
 
 // Generate synth panels
 for (let i = 0; i < contextCount; i++) {
@@ -70,6 +97,7 @@ function log(toLog: any): void {
 }
 
 function selectContext(value?: number) {
+  if (!midiPresent) return;
   if (value === undefined) value = (selectedContext + 1) % contextCount;
   selectedContext = value;
   for (let i = 0; i < contextCount; i++) {
@@ -117,6 +145,7 @@ function showProcessCode(i: number) {
   else {
     currentShownCode = shownCode;
     codeText.innerText = contexts[i].processCode;
+    codeOverlay.classList.add("showing-process-code");
     codeOverlay.style.display = "flex";
   }
 }
@@ -129,38 +158,18 @@ function showFullCode(i: number) {
   else {
     currentShownCode = shownCode;
     codeText.innerText = contexts[i].fullCode;
+    codeOverlay.classList.remove("showing-process-code");
     codeOverlay.style.display = "flex";
   }
 }
-
-async function evolve() {
-  if (evolving || favouriteContext === -1) return;
-  evolving = true;
-
-  progressBar.style.width = "0%";
-  screenCover.style.display = "block";
-  synthUIArea.style.opacity = "0.5";
-  evolveButton.classList.add("inactive");
-
-  const target = contexts[favouriteContext].topology;
-
-  const results = await evolver.evolve(target);
-
-  for (let i = 0; i < contextCount; i++) {
-    if (i < contextCount-1 && i < results.length) {
-      contexts[i].setTopology(results[i].topology);
-    }
-    else {
-      contexts[i].generateSynth();
-    }
-  }
-
-  await Promise.all(contexts.map(context => context.compile(faust)));
-
-  progressBar.style.width = "100%";
-  screenCover.style.display = "none";
-  synthUIArea.style.opacity = "1";
-  //evolveButton.classList.remove("inactive");
+async function copyCode() {
+  const code = codeText.innerText;
+  await navigator.clipboard.writeText(code);
+  console.log("yes");
+}
+async function saveCode() {
+  const code = codeText.innerText;
+  await exportFaustCode(code);
 }
 
 async function start() {
@@ -192,11 +201,16 @@ async function start() {
     const midiDeviceCount = WebMidi.inputs.length;
     if (midiDeviceCount < 1) {
       console.log("No MIDI input devices detected.");
-      //Array.prototype.forEach.call(document.getElementsByClassName("ctx-select"), (item: HTMLButtonElement) => item.style.display = "none");
+      Array.prototype.forEach.call(document.getElementsByClassName("ctx-select"), (item: HTMLButtonElement) => item.classList.add("inactive"));
+      Array.prototype.forEach.call(document.getElementsByClassName("indicators"), (item: HTMLButtonElement) => item.classList.add("midi-disabled"));
     }
     else {
       console.log(`Detected ${midiDeviceCount} MIDI input device${midiDeviceCount == 1 ? "" : "s"}:\n- ${WebMidi.inputs.map(x => x.name).join("\n- ")}`);
-    
+      
+      midiPresent = true;
+
+      selectContext(0);
+
       WebMidi.inputs.forEach((device: Input) => {
         device.addListener("midimessage", (e: MessageEvent) => {
           contexts[selectedContext].midiMessage(e.message.data);
@@ -208,6 +222,47 @@ async function start() {
   }
 }
 
+async function evolve() {
+  if (evolving || favouriteContext === -1) return;
+  evolving = true;
+
+  progressBar.style.width = "0%";
+  //screenCover.style.display = "block";
+  //synthUIArea.style.opacity = "0.5";
+  evolveButton.classList.add("inactive");
+
+  const target = contexts[favouriteContext].topology;
+
+  const results = await evolver.evolve(target);
+
+  for (let i = 0; i < contextCount; i++) {
+    if (/*i < contextCount-1 && */i < results.length) {
+      contexts[i].setTopology(results[i].topology);
+    }
+    else {
+      // Fill any extra slots with a random patch
+      contexts[i].generateSynth();
+    }
+  }
+
+  faust = new Faust({
+    debug: LOG,
+    wasmLocation: "src/libfaust/libfaust-wasm.wasm",
+    dataLocation: "src/libfaust/libfaust-wasm.data"
+  });
+
+  await faust.ready;
+
+  await Promise.all(contexts.map(context => context.compile(faust)));
+
+  progressBar.style.width = "100%";
+  //screenCover.style.display = "none";
+  //synthUIArea.style.opacity = "1";
+  evolveButton.classList.remove("inactive");
+  
+  evolving = false;
+}
+
 for (let i = 0; i < contextCount; i++) {
   document.getElementById(`ctx-select-${i}`)?.addEventListener("click", () => selectContext(i));
   document.getElementById(`stop-${i}`)?.addEventListener("click", () => stopContext(i));
@@ -217,5 +272,8 @@ for (let i = 0; i < contextCount; i++) {
 }
 
 document.getElementById("code-close")?.addEventListener("click", () => closeCode());
+document.getElementById("code-copy")?.addEventListener("click", async () => copyCode());
+document.getElementById("code-save")?.addEventListener("click", async () => saveCode());
+
 document.getElementById("evolve-btn")?.addEventListener("click", () => evolve());
 document.getElementById("start-btn")?.addEventListener("click", async () => await start());

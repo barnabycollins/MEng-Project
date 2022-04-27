@@ -4,17 +4,17 @@
 
 </head>
 <body>
-    <button id="henlo">henlo</button>
-    <button id="go" style="visibility: hidden;">frogge</button>
+    <button id="henlo">Start</button>
+    <button id="go" style="visibility: hidden;">Add nodes</button>
     <script type="module">
         import {Faust} from "faust2webaudio";
-        import * as c from "/src/constructs";
+        import {SynthContext} from "/src/synthContext";
 
-        const henlo_btn = document.getElementById("henlo");
-        const frogge_btn = document.getElementById("go");
+        const start_btn = document.getElementById("henlo");
+        const add_btn = document.getElementById("go");
 
-        henlo_btn.addEventListener("click", start);
-        frogge_btn.addEventListener("click", go);
+        start_btn.addEventListener("click", start);
+        add_btn.addEventListener("click", go);
 
         let faust;
         let audioContext;
@@ -23,7 +23,7 @@
 
         let running = false;
 
-        let bigboye;
+        let gain_node;
 
         async function start() {
             // Connect to Web Audio
@@ -37,10 +37,10 @@
             });
             await faust.ready;
 
-            context = new c.SynthContext(i, audioContext, undefined, true);
+            context = new SynthContext(i, audioContext, undefined, true);
 
-            henlo_btn.style.visibility = "hidden";
-            frogge_btn.style.visibility = "visible";
+            start_btn.style.visibility = "hidden";
+            add_btn.style.visibility = "visible";
         }
 
         
@@ -48,13 +48,13 @@
         async function go() {
             if (running) return;
             running = true;
-            bigboye = new GainNode(audioContext);
-            bigboye.connect(audioContext.destination);
+            gain_node = new GainNode(audioContext);
+            gain_node.connect(audioContext.destination);
             context.generateSynth();
             await context.compile(faust);
             context.cleanUp();
-            bigboye.disconnect(audioContext.destination);
-            bigboye = undefined;
+            gain_node.disconnect(audioContext.destination);
+            gain_node = undefined;
             running = false;
         }
 

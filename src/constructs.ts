@@ -231,7 +231,7 @@ class Oscillator extends SynthNode {
 }
 
 let fmCount = 0;
-class FrequencyModulator extends SynthNode {
+class FrequencyModulator extends ValueNode {
 	width: Parameter;
 	offset: Parameter;
 	input: SynthNode;
