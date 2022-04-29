@@ -11,7 +11,6 @@ const libfaustUrls = {
 
 // TODO: use OfflineAudioContext??
 // TODO: use other Meyda thing rather than the callback system?
-// TODO: add patch copy button, and add it to section 3.4
 // TODO: delete and reinitialise Faust after each round?
 
 const LOG = false;
@@ -252,8 +251,8 @@ async function evolve() {
 
   faust = new Faust({
     debug: LOG,
-    wasmLocation: "src/libfaust/libfaust-wasm.wasm",
-    dataLocation: "src/libfaust/libfaust-wasm.data"
+    wasmLocation: libfaustUrls.wasm.toString(),
+    dataLocation: libfaustUrls.data.toString()
   });
 
   await faust.ready;
