@@ -4,6 +4,11 @@ import { SynthContext } from "./synthContext";
 import { Evolver } from "./evolution";
 import { exportFaustCode } from "./dataExport";
 
+const libfaustUrls = {
+  data: new URL("./libfaust/libfaust-wasm.data", import.meta.url),
+  wasm: new URL("./libfaust/libfaust-wasm.wasm", import.meta.url)
+};
+
 // TODO: use OfflineAudioContext??
 // TODO: use other Meyda thing rather than the callback system?
 // TODO: add patch copy button, and add it to section 3.4
@@ -182,8 +187,8 @@ async function start() {
   // Enable Faust compiler; wait until it's ready
   faust = new Faust({
     debug: LOG,
-    wasmLocation: "src/libfaust/libfaust-wasm.wasm",
-    dataLocation: "src/libfaust/libfaust-wasm.data"
+    wasmLocation: libfaustUrls.wasm.toString(),
+    dataLocation: libfaustUrls.data.toString()
   });
   await faust.ready;
 
