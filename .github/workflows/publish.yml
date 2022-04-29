@@ -1,4 +1,4 @@
-name: Compile Sass
+name: Build & Publish to GitHub Pages
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
     - name: Set up Node environment
       uses: actions/setup-node@v3
       with:
-        node-version: 14
+        node-version: 16
     
     - name: Install modules
       run: npm install
