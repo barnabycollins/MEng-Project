@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Synth Explorer</title>
+    <script type="module" crossorigin src="/assets/main.33e8f639.js"></script>
+    <link rel="modulepreload" href="/assets/modulepreload-polyfill.b7f2da20.js">
+    <link rel="modulepreload" href="/assets/synthContext.622f2464.js">
+    <link rel="stylesheet" href="/assets/main.f759234d.css">
+  </head>
+  <body>
+    <div id="start-screen">
+      <button id="start-btn">Start</button>
+    </div>
+    <div id="main-screen">
+      <div id="progress-area">
+        <div id="progress-bar"></div>
+      </div>
+      <div id="top-row">
+        <h1>Synth Explorer</h1>
+        <button id="save-btn" class="inactive">Save</button>
+        <button id="evolve-btn" class="inactive">Evolve</button>
+      </div>
+      <div id="synth-row">
+        <!-- populated by JS -->
+      </div>
+    </div>
+    <div id="code-overlay">
+      <div id="code-box"></div>
+      <div id="code-btns">
+        <button id="code-close">
+          <img src="/assets/close-svgrepo-com.cb47a96c.svg">
+        </button>
+        <button id="code-copy">
+          <img src="/assets/copy-svgrepo-com.1a57f6f5.svg">
+        </button>
+        <button id="code-save">
+          <img src="/assets/download-from-cloud-svgrepo-com.5aa0747f.svg">
+        </button>
+      </div>
+    </div>
+    <div id="cover"></div>
+    
+  </body>
+</html>

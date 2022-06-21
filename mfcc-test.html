@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * {
+      font-family: sans-serif;
+    }
+    input, button {
+      cursor: pointer;
+    }
+  </style>
+  <script type="module" crossorigin src="/assets/mfcc_test.8e173a72.js"></script>
+  <link rel="modulepreload" href="/assets/modulepreload-polyfill.b7f2da20.js">
+  <link rel="modulepreload" href="/assets/synthContext.622f2464.js">
+</head>
+<body>
+  <button id="start-btn">Start</button>
+  
+  <div id="main-ui" style="display: none">
+    <h1>Starting...</h1>
+    <h2>Starting...</h2>
+    <input type="range" min="1" max="10" value="1" id="score-slider">
+    <span id="score-value">1</span>/10
+    <button id="score-submit">Submit</button>
+    <button id="finish-btn">Finish</button>
+    <button id="save-btn" style="display: none">Save</button>
+  </div>
+</body>
+</html>
